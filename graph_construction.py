@@ -61,33 +61,69 @@ def summury_dataset(dataset,column_name,path_saved):
 
 #funzione per aggiungere una colonna che abbia nome del gene e sostituzione amminoacidica
 def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc):
+    print(hgsvp_short,variant_classification,hgvsc)
+    if hgsvp_short=="None" and hgvsc!="":
+        nuovi_nomi={}
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{hgvsc}'])
+        for nome_gruppo, gruppo in gruppi_mutazioni:
+            if nome_gruppo[2]=="N/D":
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+            else:
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{hgvsc}'])], axis=1)
+        return data_mutational
 
-    #data_mutational.fillna({'Hugo_Symbol': 'N/D', 'HGVSp_Short': 'N/D', 'Variant_Classification': 'N/D','HGVSc': 'N/D'}, inplace=True)
-    data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D'}, inplace=True)
-    gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{hgvsc}'])
-    #print(gruppi_mutazioni)
-    nuovi_nomi={}
+ 
+    elif hgvsc=="None" and hgsvp_short!= "":
+        print("ciao")
+        nuovi_nomi={}
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}'])
+        for nome_gruppo, gruppo in gruppi_mutazioni:
+            if nome_gruppo[1]=="N/D":
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+            else:
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'])], axis=1)
+        return data_mutational
     
-    for nome_gruppo, gruppo in gruppi_mutazioni:
-        try:
+    elif (hgsvp_short=="None") and (hgvsc=="None"):
+        print("Hgvsp_Short e Hgvsc non present")
+        
+
+    #return data_mutational
+    #data_mutational.fillna({'Hugo_Symbol': 'N/D', 'HGVSp_Short': 'N/D', 'Variant_Classification': 'N/D','HGVSc': 'N/D'}, inplace=True)
+    #data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D'}, inplace=True)
+    #gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{hgvsc}'])
+    #print(gruppi_mutazioni)
+    #nuovi_nomi={}
+    
+    #for nome_gruppo, gruppo in gruppi_mutazioni:
+       # try:
             #nuovi_nomi[nome_gruppo]=f'Mut_{nome_gruppo[0]}'
 
-            if nome_gruppo[1]=="N/D" and nome_gruppo[2]=="N/D":
-               nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}'
+          #  if nome_gruppo[1]=="N/D" and nome_gruppo[2]=="N/D":
+              # nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}'
 
-            if nome_gruppo[1]=="N/D" and nome_gruppo[2]!="N/D":
-              nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
-
-            else:
+          #  if nome_gruppo[1]=="N/D" and nome_gruppo[2]!="N/D":
+             # nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+#
+           # else:
                 #print(nome_gruppo)
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
-        except:
-            print(f"Not present {hgsvp_short} or {hgvsc} in your dataset")
+              #  nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+       # except:
+          #  print(f"Not present {hgsvp_short} or {hgvsc} in your dataset")
 
   
-    data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'],row[f'{hgvsc}'])], axis=1)
+    #data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'],row[f'{hgvsc}'])], axis=1)
 
-    return data_mutational
+    #return data_mutational
+
+#funzione per cacolare, se assente, la colonna della VAF
+def calculated_vaf(riga):
+    return (riga['t_alt_count'])/(riga['t_alt_count'] + riga["t_ref_count"]) 
+
 
 
 #FIXME
@@ -313,12 +349,12 @@ def plot_graph(graph,path_save,gene):
     ig.plot(graph,f"{path_save}/plot_{gene}.pdf",
         **{
         "vertex_color": graph.vs["color"],
-        "bbox": (1500,900),
+        "bbox": (2000,1000),
         "edge_curved": 0.1,
         "vertex_label":  graph.vs["name"],
         "vertex_color": graph.vs["color"],
-        "vertex_label_size": 5,
-        "vertex_size":40,
+        "vertex_label_size": 1.5,
+        "vertex_size":20,
         "edge_color":"grey",
         "vertex_shape":["triangle" if v["vertex_type"]=="PATIENT" else "circle" for v in graph.vs ],
         #"edge_color": [get_color(x, _max_conn, _min_conn) for x in _new_g.es["weight"]],
