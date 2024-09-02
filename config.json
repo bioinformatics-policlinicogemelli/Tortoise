@@ -1,20 +1,24 @@
 {
     "Paths":{
        "data_mutational":"./pdac/data_mutational_filtered.txt",
-       "data_clinical_sample":"./pdac/data_clinical_sample_filtered.txt",
-       "data_clinical_patient": "",
+       "data_clinical_sample":"./pdac/data_clinical_sample.txt",
+       "data_clinical_patient": "./pdac/data_clinical_patient.txt",
        "output_folder":"./pdac/output"
     },
     "Mutation":{
         "column_mutation_name":"",
         "gene_of_interest":[],
         "column_gene_name":"Hugo_Symbol",
-        "column_hgvsp_short":"aaChange",
-        "column_hgvsc":"txChange",
-        "column_variant_classification":"Variant_Classification"
+        "column_hgvsp_short":"HGVSp_Short",
+        "column_hgvsc":"None",
+        "column_variant_classification":"Variant_Classification",
+        "vaf":true,
+        "vaf_score":0.05,
+        "vaf_column":""
+
     },
     "Clinical_data":{
-        "column_sample_name":"case_id",
-        "column_patient_name":"case_id"
+        "column_sample_name":"SAMPLE_ID",
+        "column_patient_name":"PATIENT_ID"
     }
 }
