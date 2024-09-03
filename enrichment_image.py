@@ -6,7 +6,7 @@ with open("config.json") as f:
 path_output=f'{data["Paths"]["output_folder"]}/Arricchimento_all_genes'
 
 
-def plot_term_go(path_pathway,file,term_go,cluster,size_1=30,size_2=15):
+def plot_term_go(path_pathway,file,term_go,cluster,adjusted,threshold,size_1=30,size_2=15):
     import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
@@ -15,8 +15,12 @@ def plot_term_go(path_pathway,file,term_go,cluster,size_1=30,size_2=15):
 
     data=pd.read_csv(file,header=0)
     if len(data)!=0:
-        data=data[data["Adjusted.P.value"].astype(float)<0.05]
-        data=data.sort_values(by="Adjusted.P.value")
+        if adjusted:
+            data=data[data["Adjusted.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="Adjusted.P.value")
+        else:
+            data=data[data["P.value"].astype(float)<threshold]
+            data=data.sort_values(by="P.value")
         data=data[0:20]
         data=data[::-1]
 
@@ -51,7 +55,11 @@ def plot_term_go(path_pathway,file,term_go,cluster,size_1=30,size_2=15):
         # Definisce i valori estremi della scala del gradiente di colore
         cbar.set_ticks([min_adjp,max_adjp])
         # Aggiunge una label alla barra dei colori
-        cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        if adjusted:
+            cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        else:
+            cbar.ax.set_ylabel('P value', rotation=-90, va='bottom',fontsize=30)
+
         # Aggiunge una legenda accanto al grafico
         #fig.subplots_adjust(right=0.8)
         #cax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
@@ -68,7 +76,7 @@ def plot_term_go(path_pathway,file,term_go,cluster,size_1=30,size_2=15):
 
 
 
-def plot_term_kegg(path_pathway,file,term_kegg,cluster,size_1=30,size_2=15):
+def plot_term_kegg(path_pathway,file,term_kegg,cluster,adjusted,threshold,size_1=30,size_2=15):
     import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
@@ -77,8 +85,13 @@ def plot_term_kegg(path_pathway,file,term_kegg,cluster,size_1=30,size_2=15):
 
     data=pd.read_csv(file,header=0)
     if len(data)!=0:
-        data=data[data["KEGG_2021_Human.Adjusted.P.value"].astype(float)<0.05]
-        data=data.sort_values(by="KEGG_2021_Human.Adjusted.P.value")
+        if adjusted:
+            data=data[data["KEGG_2021_Human.Adjusted.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="KEGG_2021_Human.Adjusted.P.value")
+        else:
+            data=data[data["KEGG_2021_Human.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="KEGG_2021_Human.P.value")
+
         data=data[0:20]
         data=data[::-1]
 
@@ -113,7 +126,11 @@ def plot_term_kegg(path_pathway,file,term_kegg,cluster,size_1=30,size_2=15):
         # Definisce i valori estremi della scala del gradiente di colore
         cbar.set_ticks([min_adjp,max_adjp])
         # Aggiunge una label alla barra dei colori
-        cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        if adjusted:
+            cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        else:
+            cbar.ax.set_ylabel('P value', rotation=-90, va='bottom',fontsize=30)
+
         # Aggiunge una legenda accanto al grafico
         #fig.subplots_adjust(right=0.8)
         #cax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
@@ -129,7 +146,7 @@ def plot_term_kegg(path_pathway,file,term_kegg,cluster,size_1=30,size_2=15):
         print(f"{file} is empty")
 
 
-def plot_term_pheno(path_pathway,file,term_pheno,cluster,size_1=30,size_2=15):
+def plot_term_pheno(path_pathway,file,term_pheno,cluster,adjusted,threshold,size_1=30,size_2=15):
     import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
@@ -138,8 +155,13 @@ def plot_term_pheno(path_pathway,file,term_pheno,cluster,size_1=30,size_2=15):
 
     data=pd.read_csv(file,header=0)
     if len(data)!=0:
-        data=data[data["PhenGenI_Association_2021.Adjusted.P.value"].astype(float)<0.05]
-        data=data.sort_values(by="PhenGenI_Association_2021.Adjusted.P.value")
+        if adjusted:
+            data=data[data["PhenGenI_Association_2021.Adjusted.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="PhenGenI_Association_2021.Adjusted.P.value")
+        else:
+            data=data[data["PhenGenI_Association_2021.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="PhenGenI_Association_2021.P.value")
+
         data=data[0:20]
         data=data[::-1]
 
@@ -174,7 +196,11 @@ def plot_term_pheno(path_pathway,file,term_pheno,cluster,size_1=30,size_2=15):
         # Definisce i valori estremi della scala del gradiente di colore
         cbar.set_ticks([min_adjp,max_adjp])
         # Aggiunge una label alla barra dei colori
-        cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        if adjusted:
+            cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        else:
+            cbar.ax.set_ylabel('P value', rotation=-90, va='bottom',fontsize=30)
+
         # Aggiunge una legenda accanto al grafico
         #fig.subplots_adjust(right=0.8)
         #cax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
@@ -190,7 +216,7 @@ def plot_term_pheno(path_pathway,file,term_pheno,cluster,size_1=30,size_2=15):
         
 
 
-def plot_term_wiki(path_pathway,file,term_wiki,cluster,size_1=30,size_2=15):
+def plot_term_wiki(path_pathway,file,term_wiki,cluster,adjusted,threshold,size_1=30,size_2=15):
     import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
@@ -199,8 +225,13 @@ def plot_term_wiki(path_pathway,file,term_wiki,cluster,size_1=30,size_2=15):
 
     data=pd.read_csv(file,header=0)
     if len(data)!=0:
-        data=data[data["WikiPathway_2023_Human.Adjusted.P.value"].astype(float)<0.05]
-        data=data.sort_values(by="WikiPathway_2023_Human.Adjusted.P.value")
+        if adjusted:
+            data=data[data["WikiPathway_2023_Human.Adjusted.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="WikiPathway_2023_Human.Adjusted.P.value")
+        else:
+            data=data[data["WikiPathway_2023_Human.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="WikiPathway_2023_Human.P.value")
+
         data=data[0:20]
         data=data[::-1]
 
@@ -235,7 +266,11 @@ def plot_term_wiki(path_pathway,file,term_wiki,cluster,size_1=30,size_2=15):
         # Definisce i valori estremi della scala del gradiente di colore
         cbar.set_ticks([min_adjp,max_adjp])
         # Aggiunge una label alla barra dei colori
-        cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        if adjusted:
+            cbar.ax.set_ylabel('Adjusted p value', rotation=-90, va='bottom',fontsize=30)
+        else:
+            cbar.ax.set_ylabel('P value', rotation=-90, va='bottom',fontsize=30)
+
         # Aggiunge una legenda accanto al grafico
         #fig.subplots_adjust(right=0.8)
         #cax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
@@ -250,25 +285,3 @@ def plot_term_wiki(path_pathway,file,term_wiki,cluster,size_1=30,size_2=15):
         print(f"{file} is empty")
 
 
-
-
-
-for folder in os.listdir(path_output):
-    full_path=os.path.join(path_output,folder)
-    if os.path.isdir(full_path):
-        for f in os.listdir(full_path):
-           # print(full_path)
-            if os.path.isfile(os.path.join(full_path,f)):
-                type_go=f.split("_")[0]
-                cluster=f.split("_")[1].split(".")[0]
-                if f.startswith("kegg"):
-                    plot_term_kegg(full_path,f"{full_path}/{f}",type_go,cluster)
-                elif f.startswith("phen"):
-                    plot_term_pheno(full_path,f"{full_path}/{f}",type_go,cluster)
-                
-                elif f.startswith("wiki"):
-                    plot_term_wiki(full_path,f"{full_path}/{f}",type_go,cluster)
-                
-                else:
-                    print(f"{full_path}/{f}")
-                    plot_term_go(full_path,f"{full_path}/{f}",type_go,cluster)
