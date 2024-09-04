@@ -267,8 +267,8 @@ def graph_creation(map_patients,map_variants):
                 edges.append((_k_variant, _k_patient))
 
     graph=ig.Graph()
-    graph.add_vertices(list(map_variants.keys()),attributes={"vertex_type":"VARIANT","color":"blue","gene":[variant.split("_")[1]for variant  in map_variants.keys()],"sost_amm":[f'{value["gene"]}_{value["sost_amm"]}' for key,value  in map_variants.items()]})
-    graph.add_vertices(list(map_patients.keys()),attributes={"vertex_type":"PATIENT","color":"red"})
+    graph.add_vertices(list(map_variants.keys()),attributes={"vertex_type":"VARIANT","color_vertex":"blue","shape_vertex":"circle","gene":[variant.split("_")[1]for variant  in map_variants.keys()],"sost_amm":[f'{value["gene"]}_{value["sost_amm"]}' for key,value  in map_variants.items()]})
+    graph.add_vertices(list(map_patients.keys()),attributes={"vertex_type":"PATIENT","color_vertex":"red","shape_vertex":"triangle-up"})
 
     graph.add_edges(edges)
     return graph
@@ -345,6 +345,7 @@ def adding_graph_color(graph,dendro):
 
     return graph
 
+#FIXME
 def plot_graph(graph,path_save,gene):
     ig.plot(graph,f"{path_save}/plot_{gene}.pdf",
         **{
@@ -362,6 +363,70 @@ def plot_graph(graph,path_save,gene):
         "vertex_frame_width":0.05,
         "layout":"fr"
         })
+
+def plot_graph_single_graph(g,path_save,label="name",color="color",shape="vertex_shape",layout="kk",title="plot_graph", on_file=True):
+    import igraph as ig
+    import datetime
+    visual_style={}
+    visual_style["layout"]=g.layout(layout)
+    visual_style["vertex_label"]=g.vs[label]
+    visual_style["color"]=g.vs[color]
+    visual_style["vertex_shape"]=g.vs["vertex_shape"]
+    visual_style["vertex_label_size"]=8
+    visual_style["vertex_size"]=35
+    visual_style["edge_width"]=0.01
+    visual_style["edge_color"]="#e3e0de"
+    visual_style["bbox"]=(len(g.vs)*25,len(g.vs)*18)
+    visual_style["margin"]=45
+    visual_style["color"]=g.vs[color]
+
+    if on_file:
+        if not os.path.exists(f"{path_save}/Images_Graph_Plot/"):
+            os.makedirs(f"{path_save}/Images_Graph_Plot/")
+        ig.plot(g,f"{path_save}/Images_Graph_Plot/{title}_{datetime.datetime.now().strftime('%Y_%m_%d')}.pdf", **visual_style)
+    else:
+        ig.plot(g,**visual_style)
+
+def add_unique_vertex(g,value,kwds={},debug=False):
+    try:
+        if g.vs.find(name=value):
+            if debug:
+                print(f"Vertex {value} already present")
+            return
+    except:
+        #id not present
+        pass
+
+    g.add_vertex(value, **kwds)
+
+
+
+def add_unique_edge(g,id1,id2,kwds={},direct=False,debug=False):
+    for e in g.es:
+        if g.vs[e.source]["name"]==id1 and g.vs[e.target]["name"]==id2 or not direct and g.vs[e.source]["name"]==id2 and g.vs[e.target]["name"]==id1 :
+            if debug:
+                print("edge is already present")
+            return
+    try:
+        g.add_edge(id1,id2)
+    except:
+        if debug:
+            print("vertex id not valid")
+
+
+def plot_cluster_as_graph(g,cluster_index,path_save):
+    g_cluster=ig.Graph()
+    for v in g.vs:
+        if v["cluster"]==cluster_index:
+            add_unique_vertex(g_cluster,v["name"],{"color":v["color_vertex"],"vertex_shape":v["shape_vertex"]})
+    for e in g.es:
+        patient_cluster=g.vs[e.source]
+        variant_cluster=g.vs[e.target]
+        if patient_cluster["cluster"]==cluster_index and variant_cluster["cluster"]==cluster_index:
+            add_unique_edge(g_cluster,patient_cluster["name"],variant_cluster["name"])
+
+    plot_graph_single_graph(g_cluster,path_save,layout="kk",title=f"graph_cluster_{cluster_index}")
+
 
 def write_graph_to_cytoscape(graph,path_save):
     graph.write_graphml(f"{path_save}/grafo_cytoscape.graphml")
