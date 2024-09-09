@@ -76,7 +76,6 @@ def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_class
 
  
     elif hgvsc=="None" and hgsvp_short!= "":
-        print("ciao")
         nuovi_nomi={}
         data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D'}, inplace=True)
         gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}'])
@@ -229,6 +228,7 @@ def create_maps(data_mutational,data_config,column_mutation,gene_interest=""):
             map_variants[_var]["gene"]=_gene
             map_variants[_var]["cons"]=_cons
             map_variants[_var]["vaf"]=_vaf
+            map_variants[_var]["variant_type"]=_variant_type
             
         map_variants[_var]["patients"].add(_paz)
 
@@ -267,7 +267,7 @@ def graph_creation(map_patients,map_variants):
                 edges.append((_k_variant, _k_patient))
 
     graph=ig.Graph()
-    graph.add_vertices(list(map_variants.keys()),attributes={"vertex_type":"VARIANT","color_vertex":"blue","shape_vertex":"circle","gene":[variant.split("_")[1]for variant  in map_variants.keys()],"sost_amm":[f'{value["gene"]}_{value["sost_amm"]}' for key,value  in map_variants.items()]})
+    graph.add_vertices(list(map_variants.keys()),attributes={"vertex_type":"VARIANT","color_vertex":"blue","shape_vertex":"circle","gene":[variant.split("_")[1]for variant  in map_variants.keys()],"sost_amm":[f'{value["sost_amm"]}' for key,value  in map_variants.items()],"variant_type":[f'{value["variant_type"]}' for key,value  in map_variants.items()],"consequence":[f'{value["cons"]}' for key,value  in map_variants.items()]})
     graph.add_vertices(list(map_patients.keys()),attributes={"vertex_type":"PATIENT","color_vertex":"red","shape_vertex":"triangle-up"})
 
     graph.add_edges(edges)
