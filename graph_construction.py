@@ -387,6 +387,7 @@ def plot_graph_single_graph(g,path_save,label="name",color="color",shape="vertex
     else:
         ig.plot(g,**visual_style)
 
+
 def add_unique_vertex(g,value,kwds={},debug=False):
     try:
         if g.vs.find(name=value):
@@ -505,7 +506,28 @@ def couple_centroid_element(dendro,map_cluster,path_save):
 
     return all_pairs
 
-
+#funzione per scrivere il numero di connessioni che ciascuna variante ha nel cluster
+def degree_variant_cluster(map_cluster,graph,path_save):
+    if not os.path.exists(f"{path_save}/Variants_Degree"):
+        os.makedirs(f"{path_save}/Variants_Degree")
+    for cluster_index in map_cluster.keys():
+        g_cluster=ig.Graph()
+        for v in graph.vs:
+            if v["cluster"]==cluster_index:
+                add_unique_vertex(g_cluster,v["name"],{"color":v["color_vertex"],"vertex_shape":v["shape_vertex"],"vertex_type":v["vertex_type"]})
+        for e in graph.es:
+            patient_cluster=graph.vs[e.source]
+            variant_cluster=graph.vs[e.target]
+            if patient_cluster["cluster"]==cluster_index and variant_cluster["cluster"]==cluster_index:
+                add_unique_edge(g_cluster,patient_cluster["name"],variant_cluster["name"])
+        degrees =g_cluster.degree()
+        with open(f"{path_save}/Variants_Degree/variants_degree_cluster{cluster_index}.csv","w") as f :
+            f.write("Variants\tDegree\n")
+            for i, degree in enumerate(degrees):
+                #print(i["name"])
+                if g_cluster.vs[i]["vertex_type"]!="PATIENT":
+                    f.write(f"{g_cluster.vs[i]['name']}\t{degree}\n")
+                    #print(g_cluster.vs[i]["name"],degree)
 
 # AGGIUNTA DELLE INFORMAZIONI CLINICHE DI INTERESSE ALLA MAPPA DEI PAZIENTI + AGGIUNTA DEL CLUSTER DI APPARTENENZA ALLA MAPPA DEI PAZIENTI E DELLE MITAZIONI
 def enriched_sample_data(data_sample,MAP_CLUSTER,MAP_PATIENTS,sample_name,patient_name):
@@ -820,6 +842,15 @@ def genes_single_cluster(map_cluster,path_save):
             for genes in set_gene:
                 f.write(genes+"\n")
 
+#creazione di un file che per ogni cluster, tiene il conto del numero di mutazioni presenti sul gene
+def genes_count_mutation_single_cluster(map_cluster_gene_abs,path_save):
+    if not os.path.exists(f"{path_save}/Gene_Count"):
+            os.makedirs(f"{path_save}/Gene_Count")
+    for cluster, infos in map_cluster_gene_abs.items():
+            with open(f"{path_save}/Gene_Count/genes_cluster_{cluster}.csv","w") as f:
+                    f.write("GENE\tCOUNT\n")
+                    for k,v in infos.items():
+                            f.write(f"{k}\t{v}\n")
 
 # AGGIUNTA DELL'ATTRIBUTO CLUSTER AI NODI DEL GRAFO
 def cluster_noded_attributes(GRAPH,MAP_PATIENTS,MAP_VARIANTS):
