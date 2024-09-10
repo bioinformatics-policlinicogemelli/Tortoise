@@ -556,6 +556,14 @@ def enriched_patient_data(data_patient,MAP_PATIENTS,patient_name):
                         MAP_PATIENTS[_sample][parameters]=variable
     return MAP_PATIENTS
 
+def adding_clinical_info_graph(graph,map_patients):
+    for vertex in graph.vs:
+        nome_paziente = vertex['name']
+        if nome_paziente in map_patients.keys():
+            # Aggiungi le info cliniche come attributi del nodo
+            for key, value in map_patients[nome_paziente].items():
+                vertex[key] = value
+    return graph
 
 #funzione per assegnare alle mutazioni dei geni target, il cluster di appartenenza
 def cluster_target_file(data_target,file_name,MAP_VARIANTS):

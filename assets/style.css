@@ -7,9 +7,9 @@
 }
 
 body {
-    background-color: #658eb8;
+    background-color: #b8c8d9;
     width: 96%;
-    height: 100%;
+    height: 200%;
     font-family: Google_font, sans-serif;
     margin-left: 2%;
     margin-right: 2%;
@@ -18,7 +18,7 @@ body {
     text-align: center;
     color: #4017b2;
     font-size: 60px;
-    filter: drop-shadow(3px 3px 0px #8974b9) drop-shadow(3px 3px 0px #b795cd);
+    filter: drop-shadow(3px 3px 0px #8974b9) drop-shadow(3px 3px 0px #c7bad0);
     text-shadow: 0 0 3px #fff;
 }
 
@@ -26,11 +26,13 @@ body {
     font-size: 25px;
     white-space: pre;
     margin-left: 2%;
+    margin-right: 3%;
     vertical-align: middle;
 }
 
 #dropdown-cluster {
     font-size: 25px;
+    margin-right: 3%;
     margin-left: 2%;
     width: 100px;
     vertical-align: middle;
@@ -38,6 +40,7 @@ body {
 
 #cytoscape-graph {
     background-color: #e9e9e9;
+    margin-left: 3%;
 }
 
 #cytoscape-selectedNodeData-markdown {
@@ -50,7 +53,16 @@ body {
 #fig1 {
     width: 100%;
     height: 600px;
+    margin-left: 3%;
 }
+
+#fig2{
+    margin-bottom: 3%;
+}
+#fig3{margin-top: 5.3%;
+margin-bottom: 3%;}
+
+
 #fig4 {
     display:block;
     width: 80%;
