@@ -27,12 +27,12 @@ def read_file(path_mutational, path_clinical_sample="", path_clinical_patient=""
     data_mutational=pd.read_csv(f"{path_mutational}",sep="\t",low_memory=False)
     
     if path_clinical_sample!="":
-        data_sample=pd.read_csv(f"{path_clinical_sample}",sep="\t")
+        data_sample=pd.read_csv(f"{path_clinical_sample}",sep="\t",skiprows=4)
     else:
         data_sample=[]
 
     if path_clinical_patient!="":
-        data_patient=pd.read_csv(f"{path_clinical_patient}",sep="\t")
+        data_patient=pd.read_csv(f"{path_clinical_patient}",sep="\t",skiprows=4)
     else:
         data_patient=[]
 

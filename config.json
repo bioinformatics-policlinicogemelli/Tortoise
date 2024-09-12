@@ -1,9 +1,10 @@
 {
     "Paths":{
-       "data_mutational":"./pdac/data_mutational_filtered.txt",
-       "data_clinical_sample":"./pdac/data_clinical_sample.txt",
-       "data_clinical_patient": "./pdac/data_clinical_patient.txt",
-       "output_folder":"./pdac/output"
+        "name_study":"endometrium",
+       "data_mutational":"./endometrium/data_mutational_filtered.txt",
+       "data_clinical_sample":"./endometrium/data_clinical_sample.txt",
+       "data_clinical_patient": "./endometrium/data_clinical_patient.txt",
+       "output_folder":"./endometrium/output"
     },
     "Mutation":{
         "column_mutation_name":"",
@@ -13,7 +14,7 @@
         "column_hgvsc":"None",
         "column_variant_classification":"Variant_Classification",
         "vaf":true,
-        "vaf_score":0.07,
+        "vaf_score":0.03,
         "vaf_column":""
 
     },
