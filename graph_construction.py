@@ -61,31 +61,35 @@ def summury_dataset(dataset,column_name,path_saved):
 
 
 #funzione per aggiungere una colonna che abbia nome del gene e sostituzione amminoacidica
-def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc):
-    print(hgsvp_short,variant_classification,hgvsc)
+def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc,chromosome,start,end):
+    print(hgsvp_short,variant_classification,hgvsc,chromosome,start,end)
     if hgsvp_short=="None" and hgvsc!="":
+        print("Sostituzione_Nucleotidicas")
         nuovi_nomi={}
-        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D'}, inplace=True)
-        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{hgvsc}'])
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{hgvsc}',f'{chromosome}',f'{start}',f'{end}'])
         for nome_gruppo, gruppo in gruppi_mutazioni:
             if nome_gruppo[2]=="N/D":
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+                #nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}_{nome_gruppo[4]}_{nome_gruppo[5]}'
             else:
                 nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
-        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{hgvsc}'])], axis=1)
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{hgvsc}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
         return data_mutational
 
  
     elif hgvsc=="None" and hgsvp_short!= "":
+        print("Sostituzione_Amminoacidica")
         nuovi_nomi={}
-        data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D'}, inplace=True)
-        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}'])
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{chromosome}',f'{start}',f'{end}'])
         for nome_gruppo, gruppo in gruppi_mutazioni:
             if nome_gruppo[1]=="N/D":
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+                #nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}_{nome_gruppo[4]}_{nome_gruppo[5]}'
             else:
                 nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
-        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'])], axis=1)
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
         return data_mutational
     
     elif (hgsvp_short=="None") and (hgvsc=="None"):
