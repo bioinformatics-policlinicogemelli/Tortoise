@@ -15,6 +15,7 @@ from comut import comut
 from comut import fileparsers
 import os
 import colorsys
+import pickle
 
 
 
@@ -60,31 +61,35 @@ def summury_dataset(dataset,column_name,path_saved):
 
 
 #funzione per aggiungere una colonna che abbia nome del gene e sostituzione amminoacidica
-def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc):
-    print(hgsvp_short,variant_classification,hgvsc)
+def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc,chromosome,start,end):
+    print(hgsvp_short,variant_classification,hgvsc,chromosome,start,end)
     if hgsvp_short=="None" and hgvsc!="":
+        print("Sostituzione_Nucleotidicas")
         nuovi_nomi={}
-        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D'}, inplace=True)
-        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{hgvsc}'])
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{hgvsc}',f'{chromosome}',f'{start}',f'{end}'])
         for nome_gruppo, gruppo in gruppi_mutazioni:
             if nome_gruppo[2]=="N/D":
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+                #nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}_{nome_gruppo[4]}_{nome_gruppo[5]}'
             else:
                 nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
-        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{hgvsc}'])], axis=1)
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{hgvsc}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
         return data_mutational
 
  
     elif hgvsc=="None" and hgsvp_short!= "":
+        print("Sostituzione_Amminoacidica")
         nuovi_nomi={}
-        data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D'}, inplace=True)
-        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}'])
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{chromosome}',f'{start}',f'{end}'])
         for nome_gruppo, gruppo in gruppi_mutazioni:
             if nome_gruppo[1]=="N/D":
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+                #nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}_{nome_gruppo[4]}_{nome_gruppo[5]}'
             else:
                 nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
-        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'])], axis=1)
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
         return data_mutational
     
     elif (hgsvp_short=="None") and (hgvsc=="None"):
@@ -121,7 +126,12 @@ def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_class
 
 #funzione per cacolare, se assente, la colonna della VAF
 def calculated_vaf(riga):
-    return (riga['t_alt_count'])/(riga['t_alt_count'] + riga["t_ref_count"]) 
+    vaf=0
+    try:
+        vaf=(riga['t_alt_count'])/(riga['t_alt_count'] + riga["t_ref_count"]) 
+    except:
+        vaf=0
+    return vaf
 
 
 
@@ -288,33 +298,32 @@ def count_gene(graph):
     return gene_total_count
 
 
-
+def process_data(args):
+    GRAPH=args[0]
+    _seed=args[1]
+    random.seed(_seed)
+    _dendro_2=GRAPH.community_leiden(objective_function="modularity")
+    modularity=_dendro_2.modularity
+    return modularity
 # SELEZIONE DEL SEED CHE Dà VALORE DI MODULARITà PIù ALTA A SEGUITO DEL LEIDEN ALGORITHM
 def selected_seed(GRAPH):
     best_seed=0
-    if False :#sys.platform.startswith('win') or sys.platform.startswith("linux"):
-        def process_data(_seed):
-            random.seed(_seed)
-            _dendro_2=GRAPH.community_leiden(objective_function="modularity")
-            modularity=_dendro_2.modularity
-            return modularity
-
-        data = list(range(10_000))
+    if sys.platform.startswith('win') or sys.platform.startswith("linux"):
+        data = []
+        for s in range(1000):
+            data.append((GRAPH,s))
         #print(__name__)
         with Pool() as p:
-            mod_results = p.map(process_data, data)
+            mod_results = p.map(process_data,data)
 
         best_seed = mod_results.index(max(mod_results))
 
     else:
-        def process_data(_seed):
-            random.seed(_seed)
-            _dendro_2=GRAPH.community_leiden(objective_function="modularity")
-            modularity=_dendro_2.modularity
-            return modularity
-
-        data = list(range(10_000))
+        #data = list(range(1000))
         mod_results = []
+        data = []
+        for s in range(1000):
+            data.append((GRAPH,s))
         for s in data:
             mod_results.append(process_data(s))
         best_seed = mod_results.index(max(mod_results))
@@ -429,9 +438,10 @@ def plot_cluster_as_graph(g,cluster_index,path_save):
     plot_graph_single_graph(g_cluster,path_save,layout="kk",title=f"graph_cluster_{cluster_index}")
 
 
-def write_graph_to_cytoscape(graph,path_save):
+def save_graph_to_file(graph,path_save):
     graph.write_graphml(f"{path_save}/grafo_cytoscape.graphml")
-
+    with open(f"{path_save}/graph.pickle", 'wb') as f:
+        pickle.dump(graph, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 # CREAZIONE DI UN DIZIONARIO MAP_CLUSTER 
@@ -511,15 +521,17 @@ def degree_variant_cluster(map_cluster,graph,path_save):
     if not os.path.exists(f"{path_save}/Variants_Degree"):
         os.makedirs(f"{path_save}/Variants_Degree")
     for cluster_index in map_cluster.keys():
-        g_cluster=ig.Graph()
-        for v in graph.vs:
-            if v["cluster"]==cluster_index:
-                add_unique_vertex(g_cluster,v["name"],{"color":v["color_vertex"],"vertex_shape":v["shape_vertex"],"vertex_type":v["vertex_type"]})
-        for e in graph.es:
-            patient_cluster=graph.vs[e.source]
-            variant_cluster=graph.vs[e.target]
-            if patient_cluster["cluster"]==cluster_index and variant_cluster["cluster"]==cluster_index:
-                add_unique_edge(g_cluster,patient_cluster["name"],variant_cluster["name"])
+        list_vertices_filtered=graph.vs.select(lambda x:x["cluster"]==cluster_index)
+        g_cluster=graph.induced_subgraph(list_vertices_filtered)
+        #g_cluster=ig.Graph()
+        #for v in graph.vs:
+         #   if v["cluster"]==cluster_index:
+             #   add_unique_vertex(g_cluster,v["name"],{"color":v["color_vertex"],"vertex_shape":v["shape_vertex"],"vertex_type":v["vertex_type"]})
+        #for e in graph.es:
+          #  patient_cluster=graph.vs[e.source]
+           # variant_cluster=graph.vs[e.target]
+           # if patient_cluster["cluster"]==cluster_index and variant_cluster["cluster"]==cluster_index:
+              #  add_unique_edge(g_cluster,patient_cluster["name"],variant_cluster["name"])
         degrees =g_cluster.degree()
         with open(f"{path_save}/Variants_Degree/variants_degree_cluster{cluster_index}.csv","w") as f :
             f.write("Variants\tDegree\n")

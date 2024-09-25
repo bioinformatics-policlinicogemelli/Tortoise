@@ -1,74 +1,122 @@
 @font-face {
-    font-family: 'Google_font';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url("/assets/Google_font.ttf") format('ttf');
+  font-family: 'Roboto', sans-serif;
+  src: url("/assets/Roboto-Regular.ttf") format('ttf');
+  font-weight: normal;
+  font-optical-sizing: auto;
+  font-style: normal;
 }
 
-body {
-    background-color: #b8c8d9;
-    width: 96%;
-    height: 200%;
-    font-family: Google_font, sans-serif;
-    margin-left: 2%;
-    margin-right: 2%;
-}
-#title {
-    text-align: center;
-    color: #4017b2;
-    font-size: 60px;
-    filter: drop-shadow(3px 3px 0px #8974b9) drop-shadow(3px 3px 0px #c7bad0);
-    text-shadow: 0 0 3px #fff;
+:root {
+  --color-1: #ffffff;
+  --color-2: #a5d8fe;
+  --color-3: #073288;
+  --color-4: #000000;
+  --color-5: #e2e2e2;
 }
 
-#cluster-text {
-    font-size: 25px;
-    white-space: pre;
-    margin-left: 2%;
-    margin-right: 3%;
-    vertical-align: middle;
+/* This creates a skinny side bar fixed to the left of the page */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6rem;
+  padding: 1rem 1rem;
+  background-color: var(--color-3);
+  transition: width 0.25s ease-in-out;
+  z-index: 9999;
+  font-family: "Roboto", sans-serif;
 }
 
-#dropdown-cluster {
-    font-size: 25px;
-    margin-right: 3%;
-    margin-left: 2%;
-    width: 100px;
-    vertical-align: middle;
+/* when the user hovers on the sidebar, expand it */
+.sidebar:hover {
+  width: 18rem;
 }
 
-#cytoscape-graph {
-    background-color: #e9e9e9;
-    margin-left: 3%;
+/* make sure the contents of the navlink don't wrap when navbar collapses */
+.sidebar .nav-link {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-#cytoscape-selectedNodeData-markdown {
-    background-color: #b4b4b4;
-    border: thin #808080 solid;
-    width: 100%;
-    white-space: pre;
+/* fix the width of the icons */
+.sidebar .nav-link i {
+  width: 3rem;
 }
 
-#fig1 {
-    width: 100%;
-    height: 600px;
-    margin-left: 3%;
+/* hide the navlink labels by default */
+.sidebar .nav-link span {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
 }
 
-#fig2{
-    margin-bottom: 3%;
+/* when the sidebar is hovered, reveal the labels */
+.sidebar:hover .nav-link span {
+  visibility: visible;
+  opacity: 1;
 }
-#fig3{margin-top: 5.3%;
-margin-bottom: 3%;}
 
+/* container for the sidebar header. make sure the contents don't wrap when
+ * the sidebar is collapsed.
+ */
+.sidebar-header {
+  display: flex;
+  justify-content: left;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
 
-#fig4 {
-    display:block;
-    width: 80%;
-    height: 650px;
-    margin-top: 2%;
-    margin-bottom: 2%;
-    margin-right:auto;
-    margin-left: auto;
+/* position the header relative to the logo and hide by default */
+.sidebar-header h2 {
+  opacity: 0;
+  margin-left: 1rem;
+  margin-bottom: 0;
+  transition: opacity 0.25s ease-in-out;
+}
+
+/* reveal the header when the sidebar is toggled */
+.sidebar:hover .sidebar-header h2 {
+  opacity: 1;
+}
+
+/* position the content relative to the collapsed sidebar */
+.content {
+  margin-left: 6rem;
+  margin-right: 0rem;
+  padding: 1rem;
+}
+
+.navbar_logo {
+  width: 4rem;
+}
+.navbar_title {
+  font-size: 1.5rem;
+  color: var(--color-5);
+}
+.navbar_span {
+  font-size: 1rem;
+}
+.navbar_entity {
+  color: var(--color-1);
+}
+.navbar_entity:hover {
+  color: var(--color-2);
+}
+.nav-pills .nav-link.active {
+  color: var(--color-3);
+  background-color: var(--color-2);
+}
+.info_block {
+  font-size: 1.5rem;
+  text-align: center;
+  background-color: var(--color-2);
+}
+.span_selector {
+  font-size: 1.5rem;
+}
+.markdown {
+  white-space: pre;
 }
