@@ -3,3 +3,4 @@
 *.xlsx
 *.png
 *.pdf
+!assets/logo.png
