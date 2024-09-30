@@ -19,7 +19,6 @@ import pickle
 
 
 
-
 # IMPORTIAMO I DATI
 # - MUTAZIONALI
 # - CLINICI DEL PAZIENTE
@@ -39,90 +38,35 @@ def read_file(path_mutational, path_clinical_sample="", path_clinical_patient=""
 
     return data_mutational,data_sample,data_patient
 
-#FIXME
-# FUNZIONE PER PLOTTARE LE INFORMAZIONI CHE VOGLIAMO A PARTIRE DAI DATI CLINICI DEL PAZIENTE E/O SAMPLE
-def summury_dataset(dataset,column_name,path_saved):
-    import os
-
-    path_folder=f"{path_saved}/Clinical_Figure/"
-    if not os.path.exists(path_folder):
-        os.makedirs(path_folder)
-    if column_name not in list(dataset.columns):
-        print(f"Colonna {column_name} non presente nel dataset")
-    else:
-        labels=list(dataset[column_name].unique())
-        ax=plt.subplot()
-        
-        #ax.pie(list(dataset[column_name].value_counts(dropna=False)),labels=labels,autopct='%1.1f%%',pctdistance=1.1, labeldistance=.6,textprops={'size': 'smaller'})
-        ax.pie(list(dataset[column_name].value_counts(dropna=False)),labels=labels,autopct='%1.1f%%')
-        plt.title(f"Descriptive data for {column_name}")
-        plt.savefig(f"{path_folder}/{column_name}_descriptive.png")
-        plt.show()
-
 
 #funzione per aggiungere una colonna che abbia nome del gene e sostituzione amminoacidica
 def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc,chromosome,start,end):
-    print(hgsvp_short,variant_classification,hgvsc,chromosome,start,end)
-    if hgsvp_short=="None" and hgvsc!="":
-        print("Sostituzione_Nucleotidicas")
+    #print(hgsvp_short,variant_classification,hgvsc,chromosome,start,end)
+    if hgsvp_short=="" or hgsvp_short==None:
         nuovi_nomi={}
-        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
-        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{hgvsc}',f'{chromosome}',f'{start}',f'{end}'])
+        data_mutational.fillna({f'{gene_name}': 'N/D', f'{variant_classification}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
+        gruppi_mutazioni = data_mutational.groupby([f'{gene_name}',f'{variant_classification}',f'{chromosome}',f'{start}',f'{end}'])
         for nome_gruppo, gruppo in gruppi_mutazioni:
-            if nome_gruppo[2]=="N/D":
-                #nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}_{nome_gruppo[4]}_{nome_gruppo[5]}'
-            else:
-                nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
-        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{hgvsc}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
+            #GENE_CHROMOSOME_START_END
+            nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}_{nome_gruppo[3]}_{nome_gruppo[4]}'
+        data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{variant_classification}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
         return data_mutational
 
- 
-    elif hgvsc=="None" and hgsvp_short!= "":
+    elif hgsvp_short!= "":
         print("Sostituzione_Amminoacidica")
         nuovi_nomi={}
         data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
         gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{chromosome}',f'{start}',f'{end}'])
         for nome_gruppo, gruppo in gruppi_mutazioni:
             if nome_gruppo[1]=="N/D":
-                #nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
+                #GENE_CHROMOSOME_START_END
                 nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}_{nome_gruppo[4]}_{nome_gruppo[5]}'
             else:
+                #GENE_HGSVp_short
                 nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
         data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'],row[f'{chromosome}'],row[f'{start}'],row[f'{end}'])], axis=1)
         return data_mutational
-    
-    elif (hgsvp_short=="None") and (hgvsc=="None"):
-        print("Hgvsp_Short e Hgvsc non present")
-        
 
-    #return data_mutational
-    #data_mutational.fillna({'Hugo_Symbol': 'N/D', 'HGVSp_Short': 'N/D', 'Variant_Classification': 'N/D','HGVSc': 'N/D'}, inplace=True)
-    #data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{hgvsc}': 'N/D'}, inplace=True)
-    #gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{hgvsc}'])
-    #print(gruppi_mutazioni)
-    #nuovi_nomi={}
-    
-    #for nome_gruppo, gruppo in gruppi_mutazioni:
-       # try:
-            #nuovi_nomi[nome_gruppo]=f'Mut_{nome_gruppo[0]}'
-
-          #  if nome_gruppo[1]=="N/D" and nome_gruppo[2]=="N/D":
-              # nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[3]}'
-
-          #  if nome_gruppo[1]=="N/D" and nome_gruppo[2]!="N/D":
-             # nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[2]}'
-#
-           # else:
-                #print(nome_gruppo)
-              #  nuovi_nomi[nome_gruppo]= f'Mut_{nome_gruppo[0]}_{nome_gruppo[1]}'
-       # except:
-          #  print(f"Not present {hgsvp_short} or {hgvsc} in your dataset")
-
-  
-    #data_mutational['nome_mutazione'] = data_mutational.apply(lambda row: nuovi_nomi[(row[f'{gene_name}'], row[f'{hgsvp_short}'], row[f'{variant_classification}'],row[f'{hgvsc}'])], axis=1)
-
-    #return data_mutational
 
 #funzione per cacolare, se assente, la colonna della VAF
 def calculated_vaf(riga):
@@ -130,65 +74,8 @@ def calculated_vaf(riga):
     try:
         vaf=(riga['t_alt_count'])/(riga['t_alt_count'] + riga["t_ref_count"]) 
     except:
-        vaf=0
+        print("error, the dataset doesn't have all column for VAF calculation : t_alt_count, t_ref_count")
     return vaf
-
-
-
-#FIXME
-#funzione per contare le mutazioni del gene target di interesse e scrivere tali info in un file csv
-def check_target_mutation_all_tissue(data_mutational, gene_target,sample_id=[],primary=False):
-    gene_mutation={}
-    list_gene=[]
-    for row in data_mutational.iterrows():
-        sample=row[1]["Tumor_Sample_Barcode"]
-        if primary:
-            if str(row[1]["Hugo_Symbol"])==gene_target and sample in sample_id:
-                gene=str(row[1]["Hugo_Symbol"])+"##"+str(row[1]["Chromosome"])+"##"+str(row[1]["Start_Position"])+"##"+str(row[1]["End_Position"])+"##"+str(row[1]["HGVSp_Short"])+"##"+str(row[1]["Exon_Number"])
-                list_gene.append(gene)
-        else:
-            if str(row[1]["Hugo_Symbol"])==gene_target:
-                gene=str(row[1]["Hugo_Symbol"])+"##"+str(row[1]["Chromosome"])+"##"+str(row[1]["Start_Position"])+"##"+str(row[1]["End_Position"])+"##"+str(row[1]["HGVSp_Short"])+"##"+str(row[1]["Exon_Number"])
-                list_gene.append(gene)
-
-
-    for element in list_gene:
-        numerosity=list_gene.count(element)
-        if element not in gene_mutation.keys():
-            gene_mutation[element]=0
-        gene_mutation[element]=numerosity
-
-    gene_mutation=dict(sorted(gene_mutation.items(), key=lambda x: x[1], reverse=True))
-    
-    name_file=""
-    if primary:
-        name_file=f"./Target_Gene_Infos/mutation_{gene_target}_primary.csv"
-    else:
-        name_file=f"./Target_Gene_Infos/mutation_{gene_target}.csv"
-
-    with open(name_file,"w") as f:
-        f.write("Gene\tChromosome\tStart\tEnd\tSost_amm\tExon\tCount\tPercentage\n")
-        for gene,count in gene_mutation.items():
-            total=len(list_gene)
-            percent=round(((count*100)/total),4)
-            gene=gene.split("##")
-            for g in gene:
-                f.write(g+"\t")
-            f.write(str(count)+"\t"+str(percent)+"\n")
-
-#FIXME
-#plot count geni target
-def plot_target_mutation(filename):
-    data_egfr_primary = pd.read_csv(filename,sep="\t")
-    gene=filename.split("_")[1]
-    #plottiamo le prime 13 mutazioni la cui comparsa va da 205 a 10
-    #data_egfr_sub=data_egfr.head(13)
-    plt.figure(figsize=(15, 10)) 
-    sns.barplot(data_egfr_primary,x="Count",y="Sost_amm",hue="Sost_amm")
-    plt.title(f"{gene} Mutation Primary Tissue")
-    plt.yticks(fontsize=9)
-    plt.xticks(fontsize=9)
-    plt.savefig(f"./Target_Gene_Infos/plot_{gene}_mutation")
 
 
 #funzione per creare mappa paziente e mutazione con categorizzazione
@@ -255,18 +142,6 @@ def create_maps(data_mutational,data_config,column_mutation,gene_interest=""):
 
     return map_patients,map_variants, map_consequence
 
-#plot delle mutazioni dei geni di interesse
-
-def plot_mutation_gene(map_consequence,list_gene_interest,path_save):
-    gene_mutation_list = [(gene, mutation) for gene, mutations in map_consequence.items() for mutation in mutations if gene in list_gene_interest]
-    df_mut = pd.DataFrame(gene_mutation_list, columns=['gene', 'mutazione'])
-    pivot_df = df_mut.pivot_table(index='gene', columns='mutazione', aggfunc='size', fill_value=0)
-    pivot_df.plot(kind='bar', stacked=True)
-    plt.xlabel('Gene')
-    plt.ylabel('Count of Mutations')
-    plt.title('Stacked Barplot of Mutation Types per Gene')
-    plt.legend(title='Mutation Types', bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.savefig(f"{path_save}/class_mutation_gene_interest.png")
 
 #Creazione del Grafo
 def graph_creation(map_patients,map_variants):
@@ -341,6 +216,7 @@ def leiden_clustering(graph, best_seed):
     return dendro
 
 
+#adding color for cluster (for cytoscape)
 def adding_graph_color(graph,dendro):
     num_clusters = len(dendro)
     # Genera colori in base al numero di cluster
@@ -373,6 +249,7 @@ def plot_graph(graph,path_save,gene):
         "layout":"fr"
         })
 
+#function to plot single graph
 def plot_graph_single_graph(g,path_save,label="name",color="color",shape="vertex_shape",layout="kk",title="plot_graph", on_file=True):
     import igraph as ig
     import datetime
@@ -396,7 +273,7 @@ def plot_graph_single_graph(g,path_save,label="name",color="color",shape="vertex
     else:
         ig.plot(g,**visual_style)
 
-
+#function to add single vertex
 def add_unique_vertex(g,value,kwds={},debug=False):
     try:
         if g.vs.find(name=value):
@@ -409,8 +286,7 @@ def add_unique_vertex(g,value,kwds={},debug=False):
 
     g.add_vertex(value, **kwds)
 
-
-
+#function to add single edge
 def add_unique_edge(g,id1,id2,kwds={},direct=False,debug=False):
     for e in g.es:
         if g.vs[e.source]["name"]==id1 and g.vs[e.target]["name"]==id2 or not direct and g.vs[e.source]["name"]==id2 and g.vs[e.target]["name"]==id1 :
@@ -423,7 +299,7 @@ def add_unique_edge(g,id1,id2,kwds={},direct=False,debug=False):
         if debug:
             print("vertex id not valid")
 
-
+#function to plot single cluster as a graph
 def plot_cluster_as_graph(g,cluster_index,path_save):
     g_cluster=ig.Graph()
     for v in g.vs:
@@ -438,13 +314,14 @@ def plot_cluster_as_graph(g,cluster_index,path_save):
     plot_graph_single_graph(g_cluster,path_save,layout="kk",title=f"graph_cluster_{cluster_index}")
 
 
+#function to save graph as graphml file for cytoscape import
 def save_graph_to_file(graph,path_save):
     graph.write_graphml(f"{path_save}/grafo_cytoscape.graphml")
     with open(f"{path_save}/graph.pickle", 'wb') as f:
         pickle.dump(graph, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-# CREAZIONE DI UN DIZIONARIO MAP_CLUSTER 
+# function to create a map for cluster
 def map_cluster_creation(graph,dendro):
     map_cluster={}
     for cluster_index in range(len(dendro)):
@@ -455,7 +332,7 @@ def map_cluster_creation(graph,dendro):
             
     return map_cluster
 
-#funzione per aggiungere il cluster alla mappa dei pazienti e delle varianti
+#function to add the cluster to patients and variants's map
 def adding_cluster_to_map(map_cluster,map_patients,map_variants):
     for cluster, infos in map_cluster.items():
         for info in infos:
@@ -466,7 +343,7 @@ def adding_cluster_to_map(map_cluster,map_patients,map_variants):
                 
     return map_patients,map_variants
 
-#funzione per scrivere i centroidi di ciascun cluster in un file
+#function to write the centroids of each cluster into a file
 def centroids_cluster(dendro,path_save):
     with open (f"{path_save}/Centroidi_Mutazioni.csv","w") as f:
         for _i in range(len(dendro)):
@@ -523,15 +400,6 @@ def degree_variant_cluster(map_cluster,graph,path_save):
     for cluster_index in map_cluster.keys():
         list_vertices_filtered=graph.vs.select(lambda x:x["cluster"]==cluster_index)
         g_cluster=graph.induced_subgraph(list_vertices_filtered)
-        #g_cluster=ig.Graph()
-        #for v in graph.vs:
-         #   if v["cluster"]==cluster_index:
-             #   add_unique_vertex(g_cluster,v["name"],{"color":v["color_vertex"],"vertex_shape":v["shape_vertex"],"vertex_type":v["vertex_type"]})
-        #for e in graph.es:
-          #  patient_cluster=graph.vs[e.source]
-           # variant_cluster=graph.vs[e.target]
-           # if patient_cluster["cluster"]==cluster_index and variant_cluster["cluster"]==cluster_index:
-              #  add_unique_edge(g_cluster,patient_cluster["name"],variant_cluster["name"])
         degrees =g_cluster.degree()
         with open(f"{path_save}/Variants_Degree/variants_degree_cluster{cluster_index}.csv","w") as f :
             f.write("Variants\tDegree\n")
@@ -557,7 +425,6 @@ def enriched_sample_data(data_sample,MAP_CLUSTER,MAP_PATIENTS,sample_name,patien
 def enriched_patient_data(data_patient,MAP_PATIENTS,patient_name):
     #generalizzazione --> CLINICAL PATIENT
     list_clinical_patient = [col for col in data_patient.columns if col != patient_name]
-
     for _row in data_patient.iterrows():
             _paz=_row[1][patient_name]
             for parameters in list_clinical_patient:
@@ -568,6 +435,7 @@ def enriched_patient_data(data_patient,MAP_PATIENTS,patient_name):
                         MAP_PATIENTS[_sample][parameters]=variable
     return MAP_PATIENTS
 
+#function to add clinical information to the vertex
 def adding_clinical_info_graph(graph,map_patients):
     for vertex in graph.vs:
         nome_paziente = vertex['name']
@@ -577,24 +445,6 @@ def adding_clinical_info_graph(graph,map_patients):
                 vertex[key] = value
     return graph
 
-#funzione per assegnare alle mutazioni dei geni target, il cluster di appartenenza
-def cluster_target_file(data_target,file_name,MAP_VARIANTS):
-    temp=[]
-    for row in data_target.iterrows():
-        #mutation=row[1]["Gene"]+"_"+str(row[1]["Chromosome"])+"_"+str(row[1]["Start"])+"_"+str(row[1]["End"])
-        mutation=row[1]["Gene"]+"_"+row[1]["Sost_amm"]
-        cluster=MAP_VARIANTS[mutation]["cluster"]
-        temp.append(cluster)
-
-    data_target["Cluster"]=temp
-    data_target.to_csv(file_name,index=False,sep="\t")
-    return data_target
-
-#funzione per assegnatre l'attributo oncotreecode al grafo
-def attributed_oncotreecode_graph(GRAPH,MAP_PATIENTS):
-    for v in GRAPH.vs():
-        if v["vertex_type"]=="PATIENT":
-            v["tumor"]=MAP_PATIENTS[v["name"]]["ONCOTREE_CODE"]
 
 
 #FIXME da migliorare la parte dell'algoritmo
@@ -685,13 +535,9 @@ def cluster_division(MAP_CLUSTER):
 
 
 
-
-
-
 #defizione del numero di connessioni per ogni variante all'interno del cluster     
 def variant_conncection_patient(_dendro_2):
     variant_patient_connection_count={}
-
     for _i in range(len(_dendro_2)):
         variant_patient_connection_count[_i]=[]
         sub_graph = _dendro_2.subgraph(_i)
@@ -743,9 +589,6 @@ def file_connection_variant(MAP_CLUSTER,MAP_PATIENTS,path_saved):
                 f.write(str(cluster)+"\t"+str(paz_1)+"\t"+str(paz_2)+"\t"+",".join(variant_common)+"\t"+str(len(variant_common))+"\n")
                 
 
-
-
-
 # CREAZIONE DI UN FILE "CONCCECTION_PATIENT" IN CUI SONO INDICATI IL NUMERO DI PAZIENTI COMUNI TRA LE VARIE VARIANTI DI UN CLUSTER
 def file_connection_patient(MAP_CLUSTER,MAP_VARIANTS,path_saved):
     with open(f"{path_saved}/connection_patient.csv","w") as f:
@@ -783,7 +626,7 @@ def numerosity_info(path_save,map_cluster):
                     count_patient+=1
             f.write(str(cluster)+"\t"+str(count_patient)+"\t"+str(count_variant)+"\t"+str(len(gene_count))+"\n")
 
- #riassunto delle informazioni (mutazioni e pazienti per ciascun cluster)
+#riassunto delle informazioni (mutazioni e pazienti per ciascun cluster)
 def summary_info(path_save,map_cluster,map_patients,patient_name):
     with open(f"{path_save}/summury_file.csv","w") as f:
         f.write("Cluster\tNode_Name\tType\tGene\tPatient_id\n")
@@ -882,18 +725,6 @@ def cluster_noded_attributes(GRAPH,MAP_PATIENTS,MAP_VARIANTS):
     return GRAPH
 
 
-# aggiunta dell'attributo "sost_amm" ai nodi del grafo
-##TODO
-
-def sost_amm_attributes(MAP_VARIANTS,GRAPH):
-    for mutation,attributes in MAP_VARIANTS.items():
-        gene=mutation.split("_")[0]
-        for v in GRAPH.vs:
-            if v["name"]==mutation:
-                v["sost_amm"]=str(gene)+"_"+str(attributes["sost_amm"])
-
-    
-
 
 # CREAZIONE, PER OGNI CLUSTER, DI UN GRAFO I CUI NODI SONO LE VARIANTI E IN CUI:
 # - LA GRANDEZZA DEI NODI è = AL NUMERO DI PAZIENTI DEL CLUSTER CHE HANNO QUELLA MUTAZIONE
@@ -985,17 +816,8 @@ def plot_distance_comutated_cluster_variants(_dendro_2,cluster_index,connection_
         }
     )
 
-'''
-if sys.platform.startswith("win") or sys.platform.startswith("linux"):
-    with Pool() as p:
-        p.map(plot_distance, cluster_more_patient)
-else:
-    for i in cluster_more_patient:
-        plot_distance(i)'''
 
 
-## patient graph
-#connection_df = pd.read_csv("connection_variant.csv", sep="\t")
 
 def plot_distance_comutated_cluster_patients(_dendro_2,cluster_index,connection_df,path_saved):
     import os
@@ -1065,8 +887,6 @@ def plot_distance_comutated_cluster_patients(_dendro_2,cluster_index,connection_
 # ONCOPLOT CON INFO QUALI:
 def oncoplot(MAP_PATIENTS,MAP_VARIANTS,cluster_more_patient,path_saved):
     import os
-
-
     DF_IDENTITY=pd.DataFrame(columns=["sample", "vars_same_cluster", "vars_outside_cluster", "tot_vars", "cluster_patient"])
     DF_VARS=pd.DataFrame(columns=["sample", "category", "value", "cluster_patient"])
     DF_COUNTER_VARS=pd.DataFrame(columns=["sample", "category", "value", "cluster_patient"])
@@ -1307,7 +1127,6 @@ def somiglianze_cluster(cluster_a, cluster_b,MAP_CLUSTER,MAP_PATIENTS):
 
 def box_plot_similitudine_one_cluster(cluster_more_patient,path_saved):
     import tap
-
     cluster_base = 0
     values = somiglianze_cluster(cluster_base, cluster_base)
     values_out = []
@@ -1342,115 +1161,4 @@ def box_plot_similitudine_all_clusters(cluster_more_patient,):
 
         tap.plot_stats(df_values, "Category", "Value")
 
-
-
-'''def main():# NOME DELLO STUDIO
-    import os 
-    name_study="./NEW_DATA_NETWORK/Data/LUNG"
-    path_results_first="./NEW_DATA_NETWORK/Data/LUNG/output_egfr_categories"
-
-    path_results_second="./NEW_DATA_NETWORK/Data/LUNG/output_egfr_categories/output_comutation"
-
-    if not os.path.exists(path_results_first):
-        os.makedirs(path_results_first)
-
-    if not os.path.exists(path_results_second):
-        os.makedirs(path_results_second)
-
-
-    
-    path_mutational=f"{name_study}/data_mutations_extended.txt"
-    path_sample=f"{name_study}/data_clinical_sample.txt"
-    path_clinical=f"{name_study}/data_clinical_patient.txt"
-
-    data_mutational,data_sample,data_patient=read_file(path_mutational,path_sample,path_clinical)
-
-    #summury_dataset(data_sample,"ONCOTREE_CODE",name_study)
-    summury_dataset(data_patient,"GENDER",path_results_first)
-    #summury_dataset(data_sample,"SAMPLE_CLASS",name_study)
-    summury_dataset(data_patient,"SMOKER",path_results_first)
-    summury_dataset(data_patient,"SMOKING.STATUS",path_results_first)
-    summury_dataset(data_patient,"PD.L1.CATEGORIES",path_results_first)
-
-
-    EGFR=True
-    TP53=False
-
-    map_patients,map_variants=created_maps(data_mutational,EGFR,TP53)
-    graph = graph_creation(map_patients,map_variants)
-    best_seed= selected_seed(graph)
-    clustering_graph_first = leiden_clustering(graph,best_seed)
-
-    #MAP CLUSTER
-    map_cluster_graph_first=map_cluster(graph,clustering_graph_first)
-
-    #add data sample
-    enriched_sample_data(data_sample,map_cluster_graph_first,map_patients,map_variants)
-
-    #add patient data
-    enriched_patient_data(data_patient,map_patients)
-
-    #enriched sample data
-    creation_cluster_clinical_data(map_patients,path_results_first)
-
-    #division of patient, variant and cluster
-    cluster_more_patient,cluster_one_patient= cluster_division(map_cluster_graph_first)
-
-    #
-    variant_patient_connection_count=variant_conncection_patient(clustering_graph_first)
-
-    patient_variant_connection_count=patient_connection_variant(clustering_graph_first)
-
-    file_connection_variant(map_cluster_graph_first,map_patients,path_results_first)
-
-    file_connection_patient(map_cluster_graph_first,map_variants,path_results_first)
-
-    #cREAZIONE DI UN FILE "VARIANT_CLUSTER" CHE RIASSUMA CLUSTER+MUTAZIONE+GENE
-    file_summary_variant_gene(path_results_first,map_cluster_graph_first,map_variants)
-
-    #add size nodi primo grafo
-    add_size_node(graph,variant_patient_connection_count)
-
-    #conteggio numero totale di mutazioni per gene
-    gene_total_count=count_gene(graph)
-    #conteggio valore assoluto e percentuale di presenza di ciascun gene nei diversi cluster
-    map_cluster_gene_count,map_cluster_gene_percent=gene_cluster_total_and_percent(map_cluster_graph_first,gene_total_count)
-    #file salvataggio % dei geni
-    file_gene_percentage(map_cluster_gene_percent,path_results_first)
-    #creazione di un file con la lista dei geni per ogni cluster
-    genes_single_cluster(map_cluster_gene_count,path_results_first)
-
-    #aggiunta del cluster i nodi
-    cluster_noded_attributes(graph,map_patients,map_variants)
-    #aggiunta di sost_amm ai nodi
-    sost_amm_attributes(map_variants,graph)
-
-    #plot delle comutazioni a partire dal grafo iniziale
-    connection_mutation_df = pd.read_csv(f"{path_results_first}/connection_patient.csv", sep="\t")
-    for cluster_index in cluster_more_patient:
-        plot_distance_comutated_cluster_variants(clustering_graph_first,cluster_index,connection_mutation_df,path_results_first)
-    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
-        with Pool() as p:
-            p.map(plot_distance_comutated_cluster_variants, cluster_more_patient)
-    else:
-        for i in cluster_more_patient:
-            plot_distance_comutated_cluster_variants(i)
-
-
-
-
-    
-    #********COMUTATED ALL MUTATIONS************+
-    graph_all_comutations,lista_edge_only_varianti=graph_comutated_variants(map_variants)
-    clustering_all_comutated = leiden_comutated_variants(graph_all_comutations)
-    file_comutated_variant_cytoscape(lista_edge_only_varianti,2,map_variants,path_results_second)
-    #MAP CLUSTER MUTATION
-    map_cluster_graph_mutation = map_cluster(graph_all_comutations,clustering_all_comutated)
-
-
-    
-
-
-if __name__=="__main__":
-    main()'''
 

@@ -3,4 +3,9 @@
 *.xlsx
 *.png
 *.pdf
+*data_mutations.txt
+*.graphml
 !assets/logo.png
+__pycache__
+pdac
+lung-old

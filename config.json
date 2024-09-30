@@ -11,8 +11,6 @@
         "gene_of_interest":[],
         "column_gene_name":"Hugo_Symbol",
         "column_hgvsp_short":"HGVSp_Short",
-        "column_hgvsc":"None",
-        "column_variant_classification":"Variant_Classification",
         "column_chromosome":"Chromosome",
         "column_start":"Start_Position",
         "column_end":"End_Position",
