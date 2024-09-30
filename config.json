@@ -13,6 +13,9 @@
         "column_hgvsp_short":"HGVSp_Short",
         "column_hgvsc":"None",
         "column_variant_classification":"Variant_Classification",
+        "column_chromosome":"Chromosome",
+        "column_start":"Start_Position",
+        "column_end":"End_Position",
         "vaf":true,
         "vaf_score":0.05,
         "vaf_column":""
@@ -28,6 +31,6 @@
         "go":true,
         "kegg":true,
         "wiki":true,
-        "pheno":true
+        "pheno":false
     }
 }
