@@ -40,7 +40,7 @@ def read_file(path_mutational, path_clinical_sample="", path_clinical_patient=""
 
 
 #funzione per aggiungere una colonna che abbia nome del gene e sostituzione amminoacidica
-def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,hgvsc,chromosome,start,end):
+def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_classification,chromosome,start,end):
     #print(hgsvp_short,variant_classification,hgvsc,chromosome,start,end)
     if hgsvp_short=="" or hgsvp_short==None:
         nuovi_nomi={}
