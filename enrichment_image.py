@@ -29,6 +29,7 @@ def plot_term_go(path_pathway,file,term_go,cluster,adjusted,threshold,size_1=30,
         max_adjp=0
         for _r in data.iterrows():
             term=str(_r[1][0])
+            #term=str(_r.iloc[1,0])
             adjusted=float(_r[1][3])
             gene=str(_r[1][-1]).split(";")
             list_adjusted_term.append([term,adjusted,len(gene)])
@@ -100,6 +101,7 @@ def plot_term_kegg(path_pathway,file,term_kegg,cluster,adjusted,threshold,size_1
         max_adjp=0
         for _r in data.iterrows():
             term=str(_r[1][0])
+            #term=str(_r.iloc[1,0])
             adjusted=float(_r[1][3])
             gene=str(_r[1][-1]).split(";")
             list_adjusted_term.append([term,adjusted,len(gene)])
@@ -146,7 +148,7 @@ def plot_term_kegg(path_pathway,file,term_kegg,cluster,adjusted,threshold,size_1
         print(f"{file} is empty")
 
 
-def plot_term_pheno(path_pathway,file,term_pheno,cluster,adjusted,threshold,size_1=30,size_2=15):
+def plot_term_reactome(path_pathway,file,term_reactome,cluster,adjusted,threshold,size_1=30,size_2=15):
     import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
@@ -156,11 +158,11 @@ def plot_term_pheno(path_pathway,file,term_pheno,cluster,adjusted,threshold,size
     data=pd.read_csv(file,header=0)
     if len(data)!=0:
         if adjusted:
-            data=data[data["PhenGenI_Association_2021.Adjusted.P.value"].astype(float)<threshold]
-            data=data.sort_values(by="PhenGenI_Association_2021.Adjusted.P.value")
+            data=data[data["Reactome_2022.Adjusted.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="Reactome_2022.Adjusted.P.value")
         else:
-            data=data[data["PhenGenI_Association_2021.P.value"].astype(float)<threshold]
-            data=data.sort_values(by="PhenGenI_Association_2021.P.value")
+            data=data[data["Reactome_2022.P.value"].astype(float)<threshold]
+            data=data.sort_values(by="Reactome_2022.P.value")
 
         data=data[0:20]
         data=data[::-1]
@@ -170,6 +172,7 @@ def plot_term_pheno(path_pathway,file,term_pheno,cluster,adjusted,threshold,size
         max_adjp=0
         for _r in data.iterrows():
             term=str(_r[1][0])
+            #term=str(_r.iloc[1,0])
             adjusted=float(_r[1][3])
             gene=str(_r[1][-1]).split(";")
             list_adjusted_term.append([term,adjusted,len(gene)])
@@ -210,7 +213,7 @@ def plot_term_pheno(path_pathway,file,term_pheno,cluster,adjusted,threshold,size
         #cax.yaxis.tick_right()
         if not os.path.exists(f'{path_pathway}/Images'):
             os.makedirs(f'{path_pathway}/Images')
-        plt.savefig(f"{path_pathway}/Images/{term_pheno}_cluster{cluster}.png")
+        plt.savefig(f"{path_pathway}/Images/{term_reactome}_cluster{cluster}.png")
     else:
         print(f"{file} is empty")
         
@@ -240,6 +243,7 @@ def plot_term_wiki(path_pathway,file,term_wiki,cluster,adjusted,threshold,size_1
         max_adjp=0
         for _r in data.iterrows():
             term=str(_r[1][0])
+            #term=str(_r.iloc[1,0])
             adjusted=float(_r[1][3])
             gene=str(_r[1][-1]).split(";")
             list_adjusted_term.append([term,adjusted,len(gene)])

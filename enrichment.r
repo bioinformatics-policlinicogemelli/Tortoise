@@ -24,7 +24,7 @@ dbs <- listEnrichrDbs()
 dbs_go <- c("GO_Biological_Process_2023","GO_Molecular_Function_2023", "GO_Cellular_Component_2023")
 dbs_kegg <- c("KEGG_2021_Human")
 dbs_wiki <- c("WikiPathway_2023_Human")
-dbs_phengeni <- c("PhenGenI_Association_2021")
+dbs_reactome <- c("Reactome_2022")
 
 json_data <- fromJSON("./config.json")
 
@@ -32,7 +32,7 @@ PATH=json_data$Paths$output_folder
 go=json_data$Enrichment$go
 kegg=json_data$Enrichment$kegg
 wiki=json_data$Enrichment$wiki
-pheno=json_data$Enrichment$pheno
+reactome=json_data$Enrichment$reactome
 
 path_gene <- paste0(PATH,"/Gene")
 file_list <- list.files(path_gene)
@@ -70,9 +70,9 @@ for (l in temp_read){
     # Se la cartella non esiste, la creiamo
     dir.create(paste0(PATH,"/Arricchimento_all_genes/GO"),recursive=TRUE)
     cat("Cartella creata:", (paste0(PATH,"/Arricchimento_all_genes/GO")), "\n")
-  } else {
-    cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/GO")), "\n")
-  }
+  } #else {
+    #cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/GO")), "\n")
+  #}
   
   #dataset GO_PROCESS
 
@@ -114,9 +114,9 @@ if (!dir.exists(paste0(PATH,"/Arricchimento_all_genes/KEGG"))) {
   # Se la cartella non esiste, la creiamo
   dir.create(paste0(PATH,"/Arricchimento_all_genes/KEGG"),recursive=TRUE)
   cat("Cartella creata:", (paste0(PATH,"/Arricchimento_all_genes/KEGG")), "\n")
-} else {
-  cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/KEGG")), "\n")
-}
+} #else {
+  #cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/KEGG")), "\n")
+#}
 
   #dataset KEGG
 write.csv(upEnriched_kegg, file = paste(PATH,"/Arricchimento_all_genes/KEGG/kegg_",cluster,".csv",sep=""), row.names = FALSE)
@@ -154,9 +154,9 @@ if (!dir.exists(paste0(PATH,"/Arricchimento_all_genes/WIKI"))) {
   # Se la cartella non esiste, la creiamo
   dir.create(paste0(PATH,"/Arricchimento_all_genes/WIKI"),recursive=TRUE)
   cat("Cartella creata:", (paste0(PATH,"/Arricchimento_all_genes/WIKI")), "\n")
-} else {
-  cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/WIKI")), "\n")
-}
+} #else {
+  #cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/WIKI")), "\n")
+#}
   
   #dataset WIKI
 write.csv(upEnriched_wiki, file = paste(PATH,"/Arricchimento_all_genes/WIKI/wiki_",cluster,".csv",sep=""), row.names = FALSE)
@@ -170,9 +170,9 @@ write.csv(upEnriched_wiki, file = paste(PATH,"/Arricchimento_all_genes/WIKI/wiki
 }
 }
 #*****************************+
-#pheno
-if(pheno==T){
- analisi_enrich_phen<- function(file_geni,cluster){
+#reactome
+if(reactome==T){
+ analisi_enrich_reactome<- function(file_geni,cluster){
   temp_read<-read.table(paste0(PATH,file_geni),            # TXT data file indicated as string or full path to the file
                       header = FALSE,    # Whether to display the header (TRUE) or not (FALSE)
                       sep = "",          # Separator of the columns of the file
@@ -183,26 +183,26 @@ for (l in temp_read){
   lista_geni<-c(lista_geni,unlist(strsplit(l,",")))
 }
 
-#inseriamo i GENI per l'analisi WIKI
-upEnriched_phen<- enrichr(genes = lista_geni, databases =dbs_phengeni)
+#inseriamo i GENI per l'analisi REACTOME
+upEnriched_reactome<- enrichr(genes = lista_geni, databases =dbs_reactome)
 
-if (!dir.exists(paste0(PATH,"/Arricchimento_all_genes/PHENO"))) {
+if (!dir.exists(paste0(PATH,"/Arricchimento_all_genes/REACTOME"))) {
   # Se la cartella non esiste, la creiamo
-  dir.create(paste0(PATH,"/Arricchimento_all_genes/PHENO"),recursive=TRUE)
-  cat("Cartella creata:", (paste0(PATH,"/Arricchimento_all_genes/PHENO")), "\n")
-} else {
-  cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/PHENO")), "\n")
-}
+  dir.create(paste0(PATH,"/Arricchimento_all_genes/REACTOME"),recursive=TRUE)
+  cat("Cartella creata:", (paste0(PATH,"/Arricchimento_all_genes/REACTOME")), "\n")
+} #else {
+ # cat("La cartella esiste già:", (paste0(PATH,"/Arricchimento_all_genes/REACTOME")), "\n")
+#}
   
-  #dataset PHEN
-  write.csv(upEnriched_phen, file = paste(PATH,"/Arricchimento_all_genes/PHENO/phen_",cluster,".csv",sep=""), row.names = FALSE)
+  #dataset REACTOME
+  write.csv(upEnriched_reactome, file = paste(PATH,"/Arricchimento_all_genes/REACTOME/reactome_",cluster,".csv",sep=""), row.names = FALSE)
  
 }
 
-#analisi_enrich_PHEN
+#analisi_enrich_REACTOME
  for (i in 0:N_CLUSTER){
   print(i)
-  analisi_enrich_phen(paste0("/Gene/genes_cluster_",i,".csv"),i)
+   analisi_enrich_reactome(paste0("/Gene/genes_cluster_",i,".csv"),i)
  }
 }
  
