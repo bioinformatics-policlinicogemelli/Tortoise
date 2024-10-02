@@ -53,7 +53,6 @@ def adding_category_mutation(data_mutational,gene_name,hgsvp_short,variant_class
         return data_mutational
 
     elif hgsvp_short!= "":
-        print("Sostituzione_Amminoacidica")
         nuovi_nomi={}
         data_mutational.fillna({f'{gene_name}': 'N/D', f'{hgsvp_short}': 'N/D', f'{variant_classification}': 'N/D',f'{chromosome}': 'N/D',f'{start}': 'N/D',f'{end}': 'N/D'}, inplace=True)
         gruppi_mutazioni = data_mutational.groupby([f'{gene_name}', f'{hgsvp_short}', f'{variant_classification}',f'{chromosome}',f'{start}',f'{end}'])
@@ -82,16 +81,11 @@ def calculated_vaf(riga):
 def create_maps(data_mutational,data_config,column_mutation,gene_interest=""):
     map_variants={}
     map_patients={}
-    map_variant_count={}
-    map_tp53={}
     map_consequence={}
     for _row in data_mutational.iterrows():
     #GET INFOS FROM DATA
         _paz=str(_row[1]["Tumor_Sample_Barcode"])
         _gene=str(_row[1][data_config["Mutation"]["column_gene_name"]])
-        _chrom = str(_row[1]["Chromosome"])
-        _chrom_start = str(_row[1]["Start_Position"])
-        _chrom_stop = str(_row[1]["End_Position"])
         _cons=str(_row[1]["Variant_Classification"])
         _variant_type=str(_row[1]["Variant_Type"])
         
@@ -159,8 +153,6 @@ def graph_creation(map_patients,map_variants):
     return graph
 
 
-
-
 #count dei geni presenti in relazione alle singole mutazioni
 def count_gene(graph):
     gene_total_count={}
@@ -180,6 +172,7 @@ def process_data(args):
     _dendro_2=GRAPH.community_leiden(objective_function="modularity")
     modularity=_dendro_2.modularity
     return modularity
+
 # SELEZIONE DEL SEED CHE Dà VALORE DI MODULARITà PIù ALTA A SEGUITO DEL LEIDEN ALGORITHM
 def selected_seed(GRAPH):
     best_seed=0
@@ -351,7 +344,7 @@ def centroids_cluster(dendro,path_save):
             max_value = 0
             _list_centroids = []
             for _v in sub_graph.vs():
-                print(_v["name"])
+                #print(_v["name"])
                 if _v["vertex_type"] != "VARIANT":
                     continue
                 temp_val = sub_graph.neighborhood_size(_v)
@@ -404,10 +397,9 @@ def degree_variant_cluster(map_cluster,graph,path_save):
         with open(f"{path_save}/Variants_Degree/variants_degree_cluster{cluster_index}.csv","w") as f :
             f.write("Variants\tDegree\n")
             for i, degree in enumerate(degrees):
-                #print(i["name"])
                 if g_cluster.vs[i]["vertex_type"]!="PATIENT":
                     f.write(f"{g_cluster.vs[i]['name']}\t{degree}\n")
-                    #print(g_cluster.vs[i]["name"],degree)
+    
 
 # AGGIUNTA DELLE INFORMAZIONI CLINICHE DI INTERESSE ALLA MAPPA DEI PAZIENTI + AGGIUNTA DEL CLUSTER DI APPARTENENZA ALLA MAPPA DEI PAZIENTI E DELLE MITAZIONI
 def enriched_sample_data(data_sample,MAP_CLUSTER,MAP_PATIENTS,sample_name,patient_name):
