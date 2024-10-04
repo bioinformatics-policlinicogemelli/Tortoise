@@ -1,8 +1,8 @@
-install.packages("devtools")
+#install.packages("devtools")
 #if(!require(devtools)) install.packages("devtools",repos = "http://cran.rstudio.com/")
 #install.packages("install_github")
-remotes::install_github("wjawaid/enrichR")
-install.packages("jsonlite")
+#remotes::install_github("wjawaid/enrichR")
+#install.packages("jsonlite")
 
 library(jsonlite)
 library(devtools)

@@ -1,10 +1,10 @@
 {
     "Paths":{
-        "name_study":"endometrium",
-       "data_mutational":"./endometrium/data_mutational_filtered.txt",
-       "data_clinical_sample":"./endometrium/data_clinical_sample.txt",
-       "data_clinical_patient": "./endometrium/data_clinical_patient.txt",
-       "output_folder":"./endometrium/output"
+        "name_study":"lung",
+       "data_mutational":"./lung/data_mutational_filtered.txt",
+       "data_clinical_sample":"./lung/data_clinical_sample.txt",
+       "data_clinical_patient": "./lung/data_clinical_patient.txt",
+       "output_folder":"./lung/output"
     },
     "Mutation":{
         "column_mutation_name":"",
@@ -27,9 +27,9 @@
     "Enrichment":{
         "adjusted":false,
         "threshold": 0.05,
-        "go":false,
-        "kegg":false,
-        "wiki":false,
-        "reactome":true
+        "go":true,
+        "kegg":true,
+        "wiki":true,
+        "reactome":false
     }
 }
