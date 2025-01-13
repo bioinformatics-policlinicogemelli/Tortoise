@@ -1,11 +1,3 @@
-*.csv
-*.txt
-*.xlsx
-*.png
-*.pdf
-*data_mutations.txt
-*.graphml
-!assets/logo.png
+test_data
+study
 __pycache__
-pdac
-lung-old

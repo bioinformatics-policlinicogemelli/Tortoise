@@ -88,7 +88,6 @@
   margin-right: 0rem;
   padding: 1rem;
 }
-
 .navbar_logo {
   width: 4rem;
 }
@@ -119,4 +118,27 @@
 }
 .markdown {
   white-space: pre;
+}
+.upload-button {
+  text-align: center;
+  width: "80%";
+  height: "90%";
+  border-width: "2px";
+  border-style: dashed;
+  border-radius: 5px;
+  background-color: var(--color-5);
+}
+.upload-button:hover {
+  cursor: pointer;
+}
+.create_study_log {
+  font-size: 2rem;
+  text-align: center;
+  background-color: var(--color-2);
+}
+.add-border {
+  border-width: "1px";
+  border-style: solid;
+  border-color:  var(--color-5);
+  border-radius: 5px;
 }
