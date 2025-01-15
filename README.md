@@ -28,15 +28,15 @@ we reccomend the creation of the study in windows or linux; being able to work i
 
 # Dashboard Organizzation
 * **Home**: In this page it's possibile to select a study, that has already been previously analysed through the tool, and is present into ***study** folder*
-* **Create Study**: In this page it's possibile to select the input file. There are 3 principale sections
-    1. **Mutation Section** (**Obbligatory**): it's possibile to upload the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped. in the second parte it's possibile specify the setting for mutational analysis.
-        - if you have a specific column for mutation name, you can select the name into **COLUMN MUTATION NAME**
-        - if you want to use the variant categorisation system underlying the tool, you must specify the name of columns  that in your dataset correspond to: **Gene Name**, **HGVSp_Short**, **Variant Classification**, **Chromosome**, **Start Position**, **End Position**, **VAF**.
-        - for the **VAF**, it's possibile to specify a threshold value that allows only mutations with vaf >= the value to be selected. In the event that such a threshold is chosen but vaf isn't present in the dataset, it will be calculated according to the formula
+* **Create Study**: In this page it's possibile to select the input file. There are 2 principale sections
+    1. **Mutation Section** (**Obbligatory**): it's possibile to upload the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped. In the second part it's possibile specify the setting for mutational analysis.
+        - if you have a specific column for mutation name, you can select the name into **Column Mutation Name**
+        - if you want to use the variant categorisation system underlying the tool, you must specify the name of columns  that in your dataset correspond to: **Gene Name**, **HGVSp_Short**, **Variant Classification**, **Chromosome**, **Start Position**, **End Position**.
+        - for the **VAF**, if you want to make a filter it's possibile to specify a threshold value that allows only mutations with vaf >= the value to be selected and the name of the column for the VAF. In the event that such a threshold is chosen but vaf isn't present in the dataset, it will be calculated according to the formula: **t_alt_count / t_alt_count + t_ref_count**
 
     2. **Clinical Section** (**Faculty**): it's possibile to upload the files containing clinical infos. Two types of files containing the clinical data can be inserted: the **data clinical patient** and the **data clinical sample**, again specifying the separator, the rows to skipped and the identifier of the *patient* (data clinical  patient) and the *sample* (data clinical sample)
 
-Once the study has been created, it can be selected on the homepage
+    **Once the study has been created, it can be selected on the homepage**
 
 
 * **Study Description**: In this page it's possibile to visualize a summary for every cluster: number of patients, number of mutations and mutation centroid. It's also possibile visualize the plot of cluster graph, the number of mutation for each gene and the degree of mutation into the cluster.
