@@ -38,7 +38,8 @@ There are 2 principale sections
     1. **Mutation Section** (**Obbligatory**): it's possibile to **upload** the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped. In the second part it's possibile specify the setting for mutational analysis.
         - if you have a specific column for mutation name, you can select the name into **Column Mutation Name**
         - if you want to use the variant categorisation system underlying the tool, you must specify the name of columns  that in your dataset correspond to: **Gene Name**, **HGVSp_Short**, **Variant Classification**, **Chromosome**, **Start Position**, **End Position**.
-        - for the **VAF**, if you want to make a filter it's possibile to specify a threshold value, that allows only mutations with vaf >= the value to be selected, and the name of the column for the VAF. In the event that such a threshold is chosen but vaf isn't present in the dataset, it will be calculated according to the formula: **t_alt_count / t_alt_count + t_ref_count** and save into the column named "t_AF".
+        - for the **VAF**, if you want to make a filter it's possibile to specify a threshold value into **VAF Score** and the name of the column for the VAF into **Column VAF**. In the event that such a threshold is chosen but vaf column isn't present in the dataset, it will be calculated according to the formula: **t_alt_count / t_alt_count + t_ref_count** and save into the column named "t_AF".
+        ⚠️Only values greater than or equal to the threshold will be considered.
 
     2. **Clinical Section** (**Faculty**): it's possibile to upload the files containing clinical infos. Two types of files containing the clinical data can be inserted: the **data clinical patient** and the **data clinical sample**, again specifying the separator, the rows to be skipped and the identifier for the *patient* (data clinical  patient) and for the *sample* (data clinical sample)
 
@@ -54,20 +55,3 @@ There are 2 principale sections
 * **Survival Analysis**: if there are info about the vital status and OS months, in this page it's possibile to visualize the kaplan mayer curve for the cluster selected, a pie chart with the distribution for alive or death patient and a statistical comparison of survival between cluster.
 
 * **Cluster Comparison**: In this page it's possibile to make a comparison between cluster. For numerical parameter, a statistical test is performed to view if there are significant statistical difference.
-
-
-# Create study 
-
-* **Paths**: specify the location of input and output data and the name of the study. <br>
-* **Mutation** : specify the setting for mutational analysis. <br> Inside *vaf* it is possibile to specify if you can apply a filter of **V**ariant **A**llele **F**requency (**VAF**) and in *vaf_score* the threshold of this filter. ⚠️Only values greater than or equal to the threshold will be considered. <br>
-in *vaf_column* it is possibile to specify the column of VAF value into the mutational file; if it is not specify, the VAF value will be calculated.
-* **Clinical_data**: specify the column to identify sample and patient name. <br>
-
-* **Enrichment** : specify the parameters for enrichment analysis. <br> Inside *adjusted* it is possibile to specify if considering the p adjusted value for the enrichment analysis and inside *threshold* the cut-off of significance for p-value or adjusted p-value. <br> Inside *go*, *kegg* and *wiki* it is possibile to specify the database for the enrichment. <br>
-## Input files
-- **data mutational** (obbligatory)
-- **data clinical sample** (optional)
-- **data clinical patient** (optional)
-
-It's necessary a data mutational file (maf, csv or txt extension) to start the analysis. 
-Clinical informations are required to matching those to the clusters, but are not obbligatory
