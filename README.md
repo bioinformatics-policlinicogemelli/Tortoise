@@ -32,7 +32,7 @@ we reccomend the creation of the study in windows or linux; being able to work i
 </div>
 
 * **Home**: In this page it's possibile to select a study, that has already been previously analysed through the tool, and is present into ***study** folder*
-* **Create Study**: In this page it's possibile to select the input file. <img src="./images/Created_Study.png" alt = "Pages Dashboard" width=400> <br>
+* **Create Study**: In this page it's possibile to select the input file. <img src="./images/Created_Study.png" alt = "Pages Dashboard" width=350 height = 250> <br>
 There are 2 principale sections
     1. **Mutation Section** (**Obbligatory**): it's possibile to **upload** the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped. In the second part it's possibile specify the setting for mutational analysis.
         - if you have a specific column for mutation name, you can select the name into **Column Mutation Name**
