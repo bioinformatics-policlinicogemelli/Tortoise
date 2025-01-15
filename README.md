@@ -36,7 +36,7 @@ we reccomend the creation of the study in windows or linux; being able to work i
 
     2. **Clinical Section** (**Faculty**): it's possibile to upload the files containing clinical infos. Two types of files containing the clinical data can be inserted: the **data clinical patient** and the **data clinical sample**, again specifying the separator, the rows to skipped and the identifier of the *patient* (data clinical  patient) and the *sample* (data clinical sample)
 
-Once the study has been created, it can be selected on the homepage
+    **Once the study has been created, it can be selected on the homepage**
 
 
 * **Study Description**: In this page it's possibile to visualize a summary for every cluster: number of patients, number of mutations and mutation centroid. It's also possibile visualize the plot of cluster graph, the number of mutation for each gene and the degree of mutation into the cluster.
