@@ -1,7 +1,7 @@
-name: tool-network
+name: tortoise
 channels:
-  - conda-forge
   - defaults
+  - conda-forge
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_gnu
@@ -10,8 +10,9 @@ dependencies:
   - bwidget=1.10.1=ha770c72_0
   - bzip2=1.0.8=h4bc722e_7
   - c-ares=1.34.4=hb9d3cd8_0
-  - ca-certificates=2024.12.14=hbcca054_0
+  - ca-certificates=2024.12.31=h06a4308_0
   - cairo=1.18.2=h3394656_1
+  - certifi=2024.12.14=py311h06a4308_0
   - curl=8.11.1=h332b0f4_0
   - font-ttf-dejavu-sans-mono=2.37=hab24e00_0
   - font-ttf-inconsolata=3.000=h77eed37_0
@@ -79,6 +80,7 @@ dependencies:
   - pixman=0.44.2=h29eaf8c_0
   - pthread-stubs=0.4=hb9d3cd8_1002
   - python=3.11.11=h9e4cc4f_1_cpython
+  - python_abi=3.11=5_cp311
   - r-askpass=1.2.1=r43h2b5f3a1_0
   - r-base=4.3.3=h5074ccb_16
   - r-cli=3.6.3=r43h0d4f4ea_1
@@ -121,8 +123,10 @@ dependencies:
   - r-withr=3.0.2=r43hc72bb7e_0
   - r-writexls=6.7.0=r43hc72bb7e_0
   - readline=8.2=h8228510_1
+  - rpy2=3.5.11=py311r43h1f0f07a_3
   - sed=4.8=he412f7d_0
   - setuptools=75.8.0=pyhff2d567_0
+  - simplegeneric=0.8.1=py311h06a4308_2
   - sysroot_linux-64=2.17=h0157908_18
   - tk=8.6.13=noxft_h4845f30_101
   - tktable=2.10=h8bc8fbc_6
@@ -141,7 +145,6 @@ dependencies:
       - autograd==1.7.0
       - autograd-gamma==0.5.0
       - blinker==1.9.0
-      - certifi==2024.12.14
       - cffi==1.17.1
       - charset-normalizer==3.4.1
       - click==8.1.8
@@ -189,7 +192,6 @@ dependencies:
       - requests==2.32.3
       - retrying==1.3.4
       - rpds-py==0.22.3
-      - rpy2==3.5.17
       - scikit-posthocs==0.11.2
       - scipy==1.15.0
       - seaborn==0.13.2

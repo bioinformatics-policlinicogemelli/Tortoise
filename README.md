@@ -1,30 +1,51 @@
-## TOOL NETWORK
+## TORTOISE
 
 This represents a bioinformatics tool that enables the construction of a bipartite graph from mutational data and the subsequent clustering of the constructed network. 
 The tool allows for the analysis of the identified clusters and their visualization through a dedicated dashboard.
 
 ## Installation and usage
+
 ### Conda
+
 This script can be run in a Conda environment. To get started, create the environment by running the following command:
 
 ```bash
-conda env create -n tool-network --file=environment.yaml
+conda env create -n tortoise --file=environment.yaml
 ```
 
 Once the environment has been created, it can be activated with the following comand:
 
 ```bash
-conda activate tool-network
+conda activate tortoise
 ```
 
-At this point, the tool network instance can be started by the command:
+At this point, the tortoise instance can be started by the command:
 
 ```bash
-python dashboard.py
+python main.py
 ```
 
 we reccomend the creation of the study in windows or linux; being able to work in multiprocessing the estimated time is 30 seconds, without is 5 minutes
 
+### Docker
+
+Build docker image
+
+```bash
+docker build -t tortoise .
+```
+
+Run the image
+
+```bash
+docker run -p 8593:8593 --name tortoise tortoise
+```
+
+If you want to mount external Study folder run
+
+```bash
+docker run -p 8593:8593 -v local_folder:/tortoise/study --name tortoise tortoise
+```
 
 # Dashboard Organizzation
 <div align="center">
@@ -33,7 +54,7 @@ we reccomend the creation of the study in windows or linux; being able to work i
 
 * **Home**: In this page it's possibile to select a study, that has already been previously analysed through the tool, and is present into ***study** folder*
 * **Create Study**: In this page it's possibile to select the input file. <br>
-<img src="./images/Created_Study.png" alt = "Pages Dashboard" width=350 height = 250> <br>
+<img src="./images/Created_Study.png" alt = "Pages Dashboard" width=800 height=400> <br>
 There are 2 principale sections
     1. **Mutation Section** (**Obbligatory**): it's possibile to **upload** the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped. In the second part it's possibile specify the setting for mutational analysis.
         - if you have a specific column for mutation name, you can select the name into **Column Mutation Name**

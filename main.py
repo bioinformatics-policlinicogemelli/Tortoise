@@ -23,7 +23,7 @@ matplotlib.use('agg')
 pd.options.mode.copy_on_write = True
 cyto.load_extra_layouts()
 # Global Vars
-APP_NAME = "Network Tool"
+APP_NAME = "Tortoise"
 APP_LOGO = "/assets/logo.png"
 LIST_STUDIES = []
 NAME_STUDY = None
@@ -689,7 +689,7 @@ def create_study(
         json.dump(DATA,f,indent=4)
 
     
-    print (os.popen(f"python tool_network.py -c {path_config}").read())
+    print (os.popen(f"python tortoise.py -c {path_config}").read())
 
     return html.Div(f"{input_namestudy} -- Study created!")
 #STUDY DESCRIPTION
