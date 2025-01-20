@@ -1,4 +1,10 @@
-## TORTOISE
+# 🧬 **TORTOISE**
+ne**T**w**OR**k **T**ool f**O**r mutat**I**onal clu**S**t**E**ring
+
+<p align="center">
+  <img src="assets/tortoise.png" height=170>
+</p>
+
 
 This represents a bioinformatics tool that enables the construction of a bipartite graph from mutational data and the subsequent clustering of the constructed network. 
 The tool allows for the analysis of the identified clusters and their visualization through a dedicated dashboard.
@@ -25,8 +31,7 @@ At this point, the tortoise instance can be started by the command:
 python main.py
 ```
 
-we reccomend the creation of the study in windows or linux; being able to work in multiprocessing the estimated time is 30 seconds, without is 5 minutes
-
+⚠️Conda environment is tested only in Windows and Linux. For other system, view Docker section.
 ### Docker
 
 Build docker image
@@ -47,7 +52,7 @@ If you want to mount external Study folder run
 docker run -p 8593:8593 -v local_folder:/tortoise/study --name tortoise tortoise
 ```
 
-# Dashboard Organizzation
+## Dashboard Organizzation
 <div align="center">
 <img src="./images/Pages_dashboard.png" alt = "Pages Dashboard" width=200>
 </div>
