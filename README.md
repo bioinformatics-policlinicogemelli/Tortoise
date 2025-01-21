@@ -39,6 +39,10 @@ Build docker image
 ```bash
 docker build -t tortoise .
 ```
+⚠️ For mac system use this comand
+```bash
+docker build --platform=linux/amd64 -t tortoise .
+```
 
 Run the image
 
