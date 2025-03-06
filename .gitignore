@@ -1,3 +1,5 @@
 test_data
 study
 __pycache__
+lf.sh
+.mypy_cache

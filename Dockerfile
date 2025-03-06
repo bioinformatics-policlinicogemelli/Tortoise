@@ -1,4 +1,4 @@
-FROM continuumio/anaconda3:2024.10-1
+FROM continuumio/miniconda3:25.1.1-2
 #IMPORT FILES
 COPY assets             /tortoise/assets
 COPY lib                /tortoise/lib
