@@ -1,5 +1,5 @@
 library(enrichR)
-options(enrichR.base.address="https://maayanlab.cloud/Enrichr/")
+options(enrichR.base.address="http://maayanlab.cloud/Enrichr/")
 options(enrichR.quiet=TRUE)
 
 all_analisi<- function(params){
@@ -16,7 +16,7 @@ all_analisi<- function(params){
     lista_geni<-c(lista_geni,unlist(strsplit(l,",")))
   }
   response_analisi<- enrichr(genes = lista_geni, databases = c("GO_Biological_Process_2023","GO_Molecular_Function_2023","GO_Cellular_Component_2023","KEGG_2021_Human","WikiPathway_2023_Human","Reactome_2022"))
-  if (length(response_analisi$GO_Biological_Process_2023) == 1) {
+  if (length(response_analisi$GO_Biological_Process_2023) < 9) {
     # API not reponde, retrying
     all_analisi(params)
   } else {

@@ -1,14 +1,15 @@
-"""
-This script sets up a Dash web application for visualizing and analyzing data.
+#!/usr/bin/env python3
+"""Dash web application for visualizing and analyzing data.
+
 The application includes multiple pages for different types of analysis,
 including study creation, study description, pathway analysis,
 clinical data visualization, survival analysis, and cluster comparison.
+
 Modules:
     - base64
     - io
     - json
     - os
-    - pickle
     - dash_bootstrap_components as dbc
     - dash_cytoscape as cyto
     - matplotlib
@@ -25,36 +26,36 @@ Modules:
     - lib.venn as venn
 Functions:
     - filter_graph(cluster): Filters the graph based on the selected cluster.
-    - redirect_pages(pathname): Redirects to the appropriate page based on the URL pathname.
-    - update_dropdown_liststudy(n_clicks): Updates the dropdown list of studies.
+    - redirect_pages(pathname): Redirects to the page based on the URL.
+    - update_dropdown_liststudy(): Updates the dropdown list of studies.
     - select_study(value): Selects a study and loads its data.
-    - update_mutational_file(filename): Updates the mutational file upload component.
-    - update_clinical_patient_file(filename): Updates the clinical patient file upload component.
-    - update_clinical_sample_file(filename): Updates the clinical sample file upload component.
-    - update_val_col_patient_name(data, sep, skip): Updates the dropdown options.
-    - update_val_col_sample_name(data, sep, skip): Updates the dropdown options.
-    - update_list_columns_mutation(data, sep, skip): Updates the dropdown options.
-    - create_study(n_clicks, ...): Creates a new study based on the provided input data.
-    - dropdpwn_cluster(n_clicks): Updates the cluster dropdown options.
-    - displaySelectedNodeData(data_dict): Displays data for the selected node in the graph.
+    - update_mutational_file(filename): Updates mutational file component.
+    - update_clinical_patient_file(filename): Updates patient file component.
+    - update_clinical_sample_file(filename): Updates sample file component.
+    - update_val_col_patient_name(data, sep, skip): Updates dropdown options.
+    - update_val_col_sample_name(data, sep, skip): Updates dropdown options.
+    - update_list_columns_mutation(data, sep, skip): Updates dropdown options.
+    - create_study(...): Creates a new study based on the provided data.
+    - dropdpwn_cluster(): Updates the cluster dropdown options.
+    - display_node_data(data_dict): Displays data for the selected node.
     - update_graph(layout): Updates the graph layout.
-    - update_cluster(cluster): Updates the cluster elements and related figures.
-    - update_go(cluster, pvalue, adjusted_pvalue, process_type): Updates the GO figure.
-    - update_kegg(cluster, pvalue, adjusted_pvalue): Updates the KEGG figure.
-    - update_reactome(cluster, pvalue, adjusted_pvalue): Updates the REACTOME figure.
-    - update_wiki(cluster, pvalue, adjusted_pvalue): Updates the WIKI figure.
-    - dropdown_box_fig_1(n_clicks): Updates the dropdown options.
-    - dropdown_box_fig_2(n_clicks): Updates the dropdown options.
-    - func_single_plot(cluster, column_name): Generates a single plot for the cluster.
-    - update_box_1(cluster, column_name): Updates the first box plot.
-    - update_box_2(cluster, column_name): Updates the second box plot.
+    - update_cluster(cluster): Updates the cluster elements and figures.
+    - update_go(cluster, pvalue, adj_pvalue, p_type): Updates the GO plot.
+    - update_kegg(cluster, pvalue, adj_pvalue): Updates KEGG plot.
+    - update_reactome(cluster, pvalue, adj_pvalue): Updates REACTOME plot.
+    - update_wiki(cluster, pvalue, adj_pvalue): Updates WIKI plot.
+    - dropdown_box_fig_1(): Updates dropdown options.
+    - dropdown_box_fig_2(): Updates dropdown options.
+    - func_single_plot(cluster, col_name): Generates a single cluster plot.
+    - update_box_1(cluster, col_name): Updates the first box plot.
+    - update_box_2(cluster, col_name): Updates the second box plot.
     - update_table_clinical_data(cluster): Updates the clinical data table.
-    - update_overall_survival(cluster): Updates the overall survival plot and statistics.
-    - update_survival_comparison(list_clusters): Updates the survival comparison plot.
-    - update_venn(list_clusters): Updates the Venn diagram for gene comparison.
+    - update_overall_survival(cluster): Updates survival plot and statistics.
+    - update_survival_comparison(list_clusters): Updates the survival plot.
+    - update_venn(list_clusters): Updates the Venn diagram for gene.
     - update_genes_common(list_clusters): Updates the table of common genes.
-    - func_multi_plot(list_clusters, column_name): Generates a multi-cluster plot for the column.
-    - update_multi_fig1(list_clusters, column_name): Updates the first multi-cluster plot.
+    - func_multi_plot(list_clusters, col_name): Generates multi-cluster plot.
+    - update_multi_fig(list_clusters, col_name): Updates multi-cluster plot.
 Usage:
     Run this script to start the Dash web application.
     The application will be available at http://127.0.0.1:8593.
@@ -64,48 +65,69 @@ import base64
 import io
 import json
 import os
-import pickle
+from pathlib import Path
 
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
-import matplotlib
+import dash_uploader as du
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import tap
-from dash import Dash, Input, Output, State, callback
-from dash import dash_table, dcc, html, no_update
+from dash import (
+    Dash,
+    Input,
+    Output,
+    State,
+    callback,
+    dash_table,
+    dcc,
+    html,
+    no_update,
+)
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import pairwise_logrank_test
 from plotly.subplots import make_subplots
+from rpy2.robjects import conversion, default_converter
 
 from lib import venn
+from tortoise import main as tortoise
 
 # Config lib
-matplotlib.use("agg")
+mpl.use("agg")
 pd.options.mode.copy_on_write = True
 cyto.load_extra_layouts()
 # Global Vars
-APP_NAME = "Tortoise"
+APP_NAME = "TORTOISE"
 APP_LOGO = "/assets/tortoise.png"
-LIST_STUDIES = []
-NAME_STUDY = None
-STUDY_CONFIG = None
-OUT_R_PATH = ""
 DF_CLINICAL_DATA = None
 NUMERIC_COLUMNS_CLINICAL = []
 ALL_COLUMNS_CLINICAL = []
 GRAPH = None
-GRAPH_ELEMENTS = None
 CLUSTERS_INDEX = []
-GENES = []
 CLUSTER_SELECTED = None
 CLUSTER_SELECTED_MULTI = []
 BOX_FIG_SELECTED_1 = None
 BOX_FIG_SELECTED_2 = None
-ALL_GENES = []
+PATH_CONFIG = None
+READY_FOR_CREATION = False
+CONTEXT_DATA = {
+    "config": {},
+    "name_study": None,
+    "name_study_input": None,
+    "list_studies": [],
+    "out_root_path": None,
+    "stats": {
+        "num_patient": 0,
+        "num_gene": 0,
+        "num_variant": 0,
+        "num_cluster": 0,
+        "modularity": 0,
+    },
+}
 
 
 def filter_graph(cluster):
@@ -125,18 +147,24 @@ def filter_graph(cluster):
                 "classes": e["vertex_type"],
                 "id": e.index,
                 "grabbable": False,
-            }
+            },
         )
     # convert and add edges
-    for e in graph_filtered.es():
-        g_ele.append({"data": {"source": e.source, "target": e.target}})
+    g_ele.extend(
+        [
+            {"data": {"source": e.source, "target": e.target}}
+            for e in graph_filtered.es()
+        ],
+    )
     return g_ele
 
 
 # APP + SIDEBAR
 APP = Dash(
-    title=APP_NAME, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
+    title=APP_NAME,
+    external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME],
 )
+du.configure_upload(APP, "temp/", use_upload_id=False)
 # ICON -> https://fontawesome.com/search
 SIDEBAR = html.Div(
     [
@@ -174,7 +202,10 @@ SIDEBAR = html.Div(
                 dbc.NavLink(
                     [
                         html.I(className="fas fa-layer-group"),
-                        html.Span("Study Description", className="navbar_span"),
+                        html.Span(
+                            "Study Description",
+                            className="navbar_span",
+                        ),
                     ],
                     href="/study_description",
                     active="exact",
@@ -184,7 +215,10 @@ SIDEBAR = html.Div(
                 dbc.NavLink(
                     [
                         html.I(className="fas fa-diagram-project"),
-                        html.Span("Pathways Analysis", className="navbar_span"),
+                        html.Span(
+                            "Pathways Analysis",
+                            className="navbar_span",
+                        ),
                     ],
                     href="/pathway_analysis",
                     active="exact",
@@ -204,7 +238,10 @@ SIDEBAR = html.Div(
                 dbc.NavLink(
                     [
                         html.I(className="fa-solid fa-chart-line"),
-                        html.Span("Survival Analysis", className="navbar_span"),
+                        html.Span(
+                            "Survival Analysis",
+                            className="navbar_span",
+                        ),
                     ],
                     href="/survival_analysis",
                     active="exact",
@@ -214,7 +251,10 @@ SIDEBAR = html.Div(
                 dbc.NavLink(
                     [
                         html.I(className="fas fa-code-compare"),
-                        html.Span("Cluster Comparision", className="navbar_span"),
+                        html.Span(
+                            "Cluster Comparision",
+                            className="navbar_span",
+                        ),
                     ],
                     href="/cluster_comparision",
                     active="exact",
@@ -232,7 +272,34 @@ APP.layout = html.Div([dcc.Location(id="url", refresh=True), SIDEBAR, CONTENT])
 
 # HOMEPAGE
 PAGE_HOME = [
-    dbc.Row([html.H2(f"Welcome to {APP_NAME}", style={"text-align": "center"})]),
+    dbc.Row([html.Img(src=APP_LOGO, className="homepage_logo")]),
+    dbc.Row(
+        [html.H1(APP_NAME, style={"text-align": "center"})],
+    ),
+    dbc.Row(
+        [
+            html.H4(
+                [
+                    html.Span("ne"),
+                    html.Span("T", style={"color": "green"}),
+                    html.Span("w"),
+                    html.Span("OR", style={"color": "green"}),
+                    html.Span("k "),
+                    html.Span("T", style={"color": "green"}),
+                    html.Span("ool f"),
+                    html.Span("O", style={"color": "green"}),
+                    html.Span("r mutat"),
+                    html.Span("I", style={"color": "green"}),
+                    html.Span("onal clu"),
+                    html.Span("S", style={"color": "green"}),
+                    html.Span("t"),
+                    html.Span("E", style={"color": "green"}),
+                    html.Span("ring"),
+                ],
+                style={"text-align": "center"},
+            ),
+        ],
+    ),
     html.Hr(),
     dbc.Row(
         [
@@ -242,14 +309,62 @@ PAGE_HOME = [
         justify="center",
     ),
     html.Hr(),
+    # HEADER
     dbc.Row(
         [
             html.Span(
-                id="dd-study-info",
-                className="dd_study_info",
-                style={"text-align": "center"},
-            )
-        ]
+                id="dd-study-header",
+                className="dd_study_header",
+            ),
+        ],
+    ),
+    # PATIENT
+    dbc.Row(
+        [
+            html.Span(
+                id="dd-study-info-patient",
+                className="dd_study_infos",
+            ),
+        ],
+    ),
+    # GENE/VARIANT
+    # CLUSTER/MODULARITY
+    dbc.Row(
+        [
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-gene",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-variant",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+        ],
+    ),
+    # CLUSTER/MODULARITY
+    dbc.Row(
+        [
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-cluster",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-modularity",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+        ],
     ),
 ]
 
@@ -257,30 +372,30 @@ PAGE_HOME = [
 # PAGING
 @callback(Output("page-content", "children"), Input("url", "pathname"))
 def redirect_pages(pathname):
+    # If the user tries to reach a different page, return a 404 message
+    selected_page = html.Div(
+        [
+            html.H1("404: Not found", className="text-danger"),
+            html.Hr(),
+            html.P(f"The pathname {pathname} was not recognised..."),
+        ],
+        className="p-3 bg-light rounded-3",
+    )
     if pathname == "/":
-        return PAGE_HOME
+        selected_page = PAGE_HOME
     elif pathname == "/create_study":
-        return PAGE_CREATE_STUDY
+        selected_page = PAGE_CREATE_STUDY
     elif pathname == "/study_description":
-        return PAGE_STUDY_DESCRIPTION
+        selected_page = PAGE_STUDY_DESCRIPTION
     elif pathname == "/pathway_analysis":
-        return PAGE_PATHWAY_ANALYSIS
+        selected_page = PAGE_PATHWAY_ANALYSIS
     elif pathname == "/cluster_comparision":
-        return PAGE_CLUSTER_COMPARISION
+        selected_page = PAGE_CLUSTER_COMPARISION
     elif pathname == "/clinical_data":
-        return PAGE_CLINICAL_DATA
+        selected_page = PAGE_CLINICAL_DATA
     elif pathname == "/survival_analysis":
-        return PAGE_SURVIVAL_ANALYSIS
-    else:
-        # If the user tries to reach a different page, return a 404 message
-        return html.Div(
-            [
-                html.H1("404: Not found", className="text-danger"),
-                html.Hr(),
-                html.P(f"The pathname {pathname} was not recognised..."),
-            ],
-            className="p-3 bg-light rounded-3",
-        )
+        selected_page = PAGE_SURVIVAL_ANALYSIS
+    return selected_page
 
 
 @callback(
@@ -288,24 +403,26 @@ def redirect_pages(pathname):
     Output("dd-study", "value"),
     Input("dd-study", "n_clicks"),
 )
-def update_dropdown_liststudy(n_clicks):
-    global LIST_STUDIES
-    if not os.path.exists("study"):
-        LIST_STUDIES = []
-    else:
-        LIST_STUDIES = os.listdir("study")
-    return LIST_STUDIES, NAME_STUDY
+def update_dropdown_liststudy(_):
+    global CONTEXT_DATA
+    CONTEXT_DATA["list_studies"] = (
+        [] if not Path("study").exists() else os.listdir("study")
+    )
+    return CONTEXT_DATA["list_studies"], CONTEXT_DATA["name_study"]
 
 
 # SELECT STUDY
 @callback(
-    Output("dd-study-info", "children"),
+    Output("dd-study-header", "children"),
+    Output("dd-study-info-patient", "children"),
+    Output("dd-study-info-gene", "children"),
+    Output("dd-study-info-variant", "children"),
+    Output("dd-study-info-cluster", "children"),
+    Output("dd-study-info-modularity", "children"),
     Input("dd-study", "value"),
-    prevent_initial_call=True,
 )
-def select_study(value):
-    global NAME_STUDY
-    global OUT_R_PATH
+def select_study(value) -> str:
+    global CONTEXT_DATA
     global GRAPH
     global CLUSTERS_INDEX
     global DF_CLINICAL_DATA
@@ -315,50 +432,88 @@ def select_study(value):
     global CLUSTER_SELECTED_MULTI
     global BOX_FIG_SELECTED_1
     global BOX_FIG_SELECTED_2
-    global STUDY_CONFIG
-    global ALL_GENES
 
     if value is None:
-        return ""
+        return no_update, no_update, no_update, no_update, no_update, no_update
     # prevent reload
-    if value == NAME_STUDY:
-        return ""
+    if value == CONTEXT_DATA["name_study"]:
+        return (
+            f"Study {value}",
+            f"Total patient: {CONTEXT_DATA['stats']['num_patient']}",
+            f"Total gene: {CONTEXT_DATA['stats']['num_gene']}",
+            f"Total variant: {CONTEXT_DATA['stats']['num_variant']}",
+            f"Total cluster: {CONTEXT_DATA['stats']['num_cluster']}",
+            f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
+        )
 
-    NAME_STUDY = value
-    OUT_R_PATH = os.path.join("study", NAME_STUDY, "output")
-    with open(os.path.join(OUT_R_PATH, "graph.pickle"), "rb") as f:
-        GRAPH = pickle.load(f)
+    # Load config
+    with Path("study", value, "config.json").open("r") as json_data:
+        d = json.load(json_data)
+        CONTEXT_DATA["config"] = d
+
+    CONTEXT_DATA["name_study"] = value
+    CONTEXT_DATA["out_root_path"] = Path(
+        "study",
+        CONTEXT_DATA["name_study"],
+        "output",
+    )
+    GRAPH = np.load(
+        CONTEXT_DATA["out_root_path"].joinpath("graph.npy"),
+        allow_pickle="TRUE",
+    ).item()
 
     CLUSTERS_INDEX = [int(c) for c in set(GRAPH.vs["cluster"])]
-    ALL_GENES = set(GRAPH.vs["gene"])
 
-    # Find all numerical column
     DF_CLINICAL_DATA = pd.read_csv(
-        os.path.join(OUT_R_PATH, "cluster_clinical_data.csv"),
+        CONTEXT_DATA["out_root_path"].joinpath("cluster_clinical_data.csv"),
         sep="\t",
         engine="python",
     )
-    DF_CLINICAL_DATA_ALL = DF_CLINICAL_DATA.copy()
-    DF_CLINICAL_DATA_ALL["cluster"] = "ALL"
-    DF_CLINICAL_DATA = pd.concat([DF_CLINICAL_DATA, DF_CLINICAL_DATA_ALL])
-    NUMERIC_COLUMNS_CLINICAL = list(
-        DF_CLINICAL_DATA.select_dtypes(include=np.number).columns
-    )
-    ALL_COLUMNS_CLINICAL = list(DF_CLINICAL_DATA.columns)
-    ALL_COLUMNS_CLINICAL.remove("cluster")
-    # Load Config
-    with open(os.path.join("study", NAME_STUDY, "config.json"), "r") as config_file:
-        STUDY_CONFIG = json.load(config_file)
+    if len(DF_CLINICAL_DATA.columns) > 1:
+        df_clinical_data_all = DF_CLINICAL_DATA.copy()
+        df_clinical_data_all["cluster"] = "ALL"
+        DF_CLINICAL_DATA = pd.concat([DF_CLINICAL_DATA, df_clinical_data_all])
+        NUMERIC_COLUMNS_CLINICAL = list(
+            DF_CLINICAL_DATA.select_dtypes(include=np.number).columns,
+        )
+        ALL_COLUMNS_CLINICAL = list(DF_CLINICAL_DATA.columns)
+        ALL_COLUMNS_CLINICAL.remove("cluster")
+        BOX_FIG_SELECTED_1 = ALL_COLUMNS_CLINICAL[0]
+        BOX_FIG_SELECTED_2 = ALL_COLUMNS_CLINICAL[-1]
     # Reset selection
     CLUSTER_SELECTED = CLUSTERS_INDEX[0]
     CLUSTER_SELECTED_MULTI = ["ALL", CLUSTERS_INDEX[0]]
-    BOX_FIG_SELECTED_1 = ALL_COLUMNS_CLINICAL[0]
-    BOX_FIG_SELECTED_2 = ALL_COLUMNS_CLINICAL[-1]
-    return f'You have selected "{value}" study'
+
+    # STATS
+    stats = pd.read_csv(
+        CONTEXT_DATA["out_root_path"].joinpath("numerosity_cluster.csv"),
+        sep="\t",
+        engine="python",
+    )
+    CONTEXT_DATA["stats"]["num_patient"] = stats["Patient"].sum()
+    CONTEXT_DATA["stats"]["num_gene"] = stats["Gene"].sum()
+    CONTEXT_DATA["stats"]["num_variant"] = stats["Variant"].sum()
+    CONTEXT_DATA["stats"]["num_cluster"] = len(stats)
+    with (
+        CONTEXT_DATA["out_root_path"]
+        .joinpath("modularity.info")
+        .open("r") as f
+    ):
+        CONTEXT_DATA["stats"]["modularity"] = f.readline()
+
+    return (
+        f"Study {value}",
+        f"Total patient: {CONTEXT_DATA['stats']['num_patient']}",
+        f"Total gene: {CONTEXT_DATA['stats']['num_gene']}",
+        f"Total variant: {CONTEXT_DATA['stats']['num_variant']}",
+        f"Total cluster: {CONTEXT_DATA['stats']['num_cluster']}",
+        f"cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
+    )
 
 
 # CREATE STUDY
 PAGE_CREATE_STUDY = [
+    dcc.ConfirmDialog(id="confirm-study", message="..."),
     dbc.Row([html.H2("Study Configuration")]),
     # NAME STUDY
     dbc.Row(
@@ -372,12 +527,15 @@ PAGE_CREATE_STUDY = [
             dbc.Col(
                 [
                     dcc.Input(
-                        id="input_namestudy", type="text", placeholder="Name study"
+                        id="input_namestudy",
+                        type="text",
+                        placeholder="Name study",
+                        style={"width": "100%"},
                     ),
                 ],
-                width=2,
+                width=3,
             ),
-        ]
+        ],
     ),
     # DATA MUTATIONAL
     dbc.Row(
@@ -390,15 +548,13 @@ PAGE_CREATE_STUDY = [
             ),
             dbc.Col(
                 [
-                    dcc.Upload(
+                    du.Upload(
                         id="mutational-file",
-                        children=html.Span("Upload Mutational File"),
-                        # Allow multiple files to be uploaded
-                        multiple=False,
-                    )
+                        text="Upload Mutational File",
+                        chunk_size=100,
+                    ),
                 ],
-                width=2,
-                className="upload-button",
+                width=3,
             ),
             dbc.Col(
                 [
@@ -421,7 +577,7 @@ PAGE_CREATE_STUDY = [
                 ],
                 width=2,
             ),
-        ]
+        ],
     ),
     # COLUMN SAMPLE NAME
     dbc.Row(
@@ -437,11 +593,11 @@ PAGE_CREATE_STUDY = [
                     dcc.Dropdown(
                         options=[],
                         id="dd-column-sample-name-mutation",
-                    )
+                    ),
                 ],
-                width=2,
+                width=3,
             ),
-        ]
+        ],
     ),
     # COLUMN GENE NAME
     dbc.Row(
@@ -457,11 +613,11 @@ PAGE_CREATE_STUDY = [
                     dcc.Dropdown(
                         options=[],
                         id="dd-column-gene",
-                    )
+                    ),
                 ],
-                width=2,
+                width=3,
             ),
-        ]
+        ],
     ),
     # IDENTIFIER COLUMNS
     dbc.Row(
@@ -473,10 +629,16 @@ PAGE_CREATE_STUDY = [
                 width=2,
             ),
             dbc.Col(
-                [dcc.Dropdown(options=[], id="dd-identifier-columns", multi=True)],
-                width=2,
+                [
+                    dcc.Dropdown(
+                        options=[],
+                        id="dd-identifier-columns",
+                        multi=True,
+                    ),
+                ],
+                width=3,
             ),
-        ]
+        ],
     ),
     # COLUMN VAF
     dbc.Row(
@@ -492,11 +654,11 @@ PAGE_CREATE_STUDY = [
                     dcc.Dropdown(
                         options=[],
                         id="dd-vaf",
-                    )
+                    ),
                 ],
-                width=2,
+                width=3,
             ),
-        ]
+        ],
     ),
     # COLUMN VAF SCORE
     dbc.Row(
@@ -516,11 +678,12 @@ PAGE_CREATE_STUDY = [
                         min=0,
                         max=1,
                         step=0.01,
+                        style={"width": "100%"},
                     ),
                 ],
-                width=4,
+                width=3,
             ),
-        ]
+        ],
     ),
     # CLINICAL PATIENT
     dbc.Row(
@@ -533,15 +696,13 @@ PAGE_CREATE_STUDY = [
             ),
             dbc.Col(
                 [
-                    dcc.Upload(
+                    du.Upload(
                         id="clinical-patient-file",
-                        children=html.Span("Upload Clinical Patient File"),
-                        # Allow multiple files to be uploaded
-                        multiple=False,
-                    )
+                        text="Upload Clinical Patient File",
+                        chunk_size=100,
+                    ),
                 ],
-                width=2,
-                className="upload-button",
+                width=3,
             ),
             dbc.Col(
                 [
@@ -564,7 +725,7 @@ PAGE_CREATE_STUDY = [
                 ],
                 width=2,
             ),
-        ]
+        ],
     ),
     # COLUMN PATIENT NAME
     dbc.Row(
@@ -580,11 +741,51 @@ PAGE_CREATE_STUDY = [
                     dcc.Dropdown(
                         options=[],
                         id="dd-column-patient-name",
-                    )
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
+    # COLUMN SURVIVAL EVENT
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("Column Survival Event:"),
                 ],
                 width=2,
             ),
-        ]
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        options=[],
+                        id="dd-column-survival-event",
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
+    # COLUMN SURVIVAL TIME
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("Column Survival Time:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        options=[],
+                        id="dd-column-survival-time",
+                    ),
+                ],
+                width=3,
+            ),
+        ],
     ),
     # CLINICAL SAMPLE
     dbc.Row(
@@ -597,15 +798,13 @@ PAGE_CREATE_STUDY = [
             ),
             dbc.Col(
                 [
-                    dcc.Upload(
+                    du.Upload(
                         id="clinical-sample-file",
-                        children=html.Span("Upload Clinical Sample File"),
-                        # Allow multiple files to be uploaded
-                        multiple=False,
-                    )
+                        text="Upload Clinical Sample File",
+                        chunk_size=100,
+                    ),
                 ],
-                width=2,
-                className="upload-button",
+                width=3,
             ),
             dbc.Col(
                 [
@@ -628,7 +827,7 @@ PAGE_CREATE_STUDY = [
                 ],
                 width=2,
             ),
-        ]
+        ],
     ),
     # COLUMN SAMPLE NAME
     dbc.Row(
@@ -644,94 +843,82 @@ PAGE_CREATE_STUDY = [
                     dcc.Dropdown(
                         options=[],
                         id="dd-column-sample-name",
-                    )
+                    ),
                 ],
-                width=2,
+                width=3,
             ),
-        ]
+        ],
     ),
     # CREATE STUDY BUTTON
-    dbc.Row([html.Button("Create Study", id="create-study-button", n_clicks=0)]),
+    dbc.Row(
+        [
+            html.Button("Create Study", id="create-study-button", n_clicks=0),
+        ],
+    ),
     # LOADING
     dbc.Row(
         [
             dcc.Loading(
                 children=[
-                    html.Span(id="create-study-log", className="create_study_log")
+                    html.Span(
+                        id="create-study-log",
+                        className="create_study_log",
+                    ),
                 ],
             ),
-        ]
+        ],
     ),
 ]
-
-
-@callback(
-    Output("mutational-file", "children"),
-    Input("mutational-file", "filename"),
-    prevent_initial_call=True,
-)
-def update_mutational_file(filename):
-    return filename
-
-
-@callback(
-    Output("clinical-patient-file", "children"),
-    Input("clinical-patient-file", "filename"),
-    prevent_initial_call=True,
-)
-def update_clinical_patient_file(filename):
-    return filename
-
-
-@callback(
-    Output("clinical-sample-file", "children"),
-    Input("clinical-sample-file", "filename"),
-    prevent_initial_call=True,
-)
-def update_clinical_sample_file(filename):
-    return filename
 
 
 # dropdown column patient name
 @callback(
     Output("dd-column-patient-name", "options"),
+    Output("dd-column-survival-event", "options"),
+    Output("dd-column-survival-time", "options"),
     [
-        Input("clinical-patient-file", "contents"),
+        Input("clinical-patient-file", "isCompleted"),
+        State("clinical-patient-file", "fileNames"),
         Input("clinical-patient-separator", "value"),
         Input("clinical-patient-skiprow", "value"),
     ],
     prevent_initial_call=True,
 )
-def update_val_col_patient_name(data, sep, skip):
-    if data is None or sep is None or skip is None:
-        return []
-    content_type, content_string = data.split(",")
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(
-        io.StringIO(decoded.decode("utf-8")), sep=sep, skiprows=skip, engine="python"
+def update_list_columns_patient_name(loaded, filename, sep, skip):
+    if not loaded or sep is None or skip is None:
+        return [], [], []
+    df_patient = pd.read_csv(
+        Path("temp", filename[0]),
+        sep=sep,
+        skiprows=skip,
+        engine="python",
+        nrows=0,
     )
-    return df.columns
+    return df_patient.columns, df_patient.columns, df_patient.columns
 
 
 # dropdown column sample name
 @callback(
     Output("dd-column-sample-name", "options"),
     [
-        Input("clinical-sample-file", "contents"),
+        Input("clinical-sample-file", "isCompleted"),
+        State("clinical-sample-file", "fileNames"),
         Input("clinical-sample-separator", "value"),
         Input("clinical-sample-skiprow", "value"),
     ],
     prevent_initial_call=True,
 )
-def update_val_col_sample_name(data, sep, skip):
-    if data is None or sep is None or skip is None:
+def update_list_columns_sample_name(loaded, filename, sep, skip):
+    if not loaded or sep is None or skip is None:
         return []
-    content_type, content_string = data.split(",")
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(
-        io.StringIO(decoded.decode("utf-8")), sep=sep, skiprows=skip, engine="python"
+    df_sample = pd.read_csv(
+        Path("temp", filename[0]),
+        sep=sep,
+        skiprows=skip,
+        engine="python",
+        nrows=0,
     )
-    return df.columns
+    return df_sample.columns
 
 
 # dropdown mutation
@@ -741,37 +928,43 @@ def update_val_col_sample_name(data, sep, skip):
     Output("dd-vaf", "options"),
     Output("dd-column-sample-name-mutation", "options"),
     [
-        Input("mutational-file", "contents"),
+        Input("mutational-file", "isCompleted"),
+        State("mutational-file", "fileNames"),
         Input("mutational-separator", "value"),
         Input("mutational-skiprow", "value"),
     ],
     prevent_initial_call=True,
 )
-def update_list_columns_mutation(data, sep, skip):
-    if data is None or sep is None or skip is None:
+def update_list_columns_mutation(loaded, filename, sep, skip):
+    if not loaded or sep is None or skip is None:
         return [], [], [], []
-    content_type, content_string = data.split(",")
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(
-        io.StringIO(decoded.decode("utf-8")), sep=sep, skiprows=skip, engine="python"
+    df_mut = pd.read_csv(
+        Path("temp", filename[0]),
+        sep=sep,
+        skiprows=skip,
+        engine="python",
+        nrows=0,
     )
-    return df.columns, df.columns, df.columns, df.columns
+    return df_mut.columns, df_mut.columns, df_mut.columns, df_mut.columns
 
 
 @callback(
-    Output("create-study-log", "children"),
+    Output("confirm-study", "displayed"),
+    Output("confirm-study", "message"),
     Input("create-study-button", "n_clicks"),
     State("input_namestudy", "value"),
-    State("mutational-file", "contents"),
+    State("mutational-file", "fileNames"),
     State("mutational-separator", "value"),
     State("mutational-skiprow", "value"),
-    State("clinical-patient-file", "contents"),
+    State("clinical-patient-file", "fileNames"),
     State("clinical-patient-separator", "value"),
     State("clinical-patient-skiprow", "value"),
-    State("clinical-sample-file", "contents"),
+    State("clinical-sample-file", "fileNames"),
     State("clinical-sample-separator", "value"),
     State("clinical-sample-skiprow", "value"),
     State("dd-column-patient-name", "value"),
+    State("dd-column-survival-event", "value"),
+    State("dd-column-survival-time", "value"),
     State("dd-column-sample-name", "value"),
     State("dd-column-sample-name-mutation", "value"),
     State("dd-column-gene", "value"),
@@ -781,18 +974,20 @@ def update_list_columns_mutation(data, sep, skip):
     prevent_initial_call=True,
 )
 def create_study(
-    n_clicks,
+    _,
     input_namestudy,
-    mutational_data,
+    mutational_filename,
     mutational_separator,
     mutational_skiprow,
-    clinical_patient_data,
+    clinical_patient_filename,
     clinical_patient_separator,
     clinical_patient_skiprow,
-    clinical_sample_data,
+    clinical_sample_filename,
     clinical_sample_separator,
     clinical_sample_skiprow,
     c_patient_name,
+    c_surv_event,
+    c_surv_time,
     c_sample_name,
     c_sample_mutation,
     c_gene,
@@ -800,130 +995,185 @@ def create_study(
     c_vaf,
     vaf_score,
 ):
+    global CONTEXT_DATA
+    global PATH_CONFIG
+    global READY_FOR_CREATION
+
+    READY_FOR_CREATION = False
     # CHECK INPUT DATA
     if input_namestudy is None:
-        return html.Div("Please insert name for study")
-    if os.path.exists(os.path.join("study", input_namestudy, "input")):
-        return html.Div("Name study already exist")
-    if mutational_data is None:
-        return html.Div("Please insert file for mutational data")
+        return True, "Please insert name for study"
+    CONTEXT_DATA["name_study_input"] = input_namestudy
+    if Path("study", input_namestudy, "input").exists():
+        return True, "Name study already exist"
+    if mutational_filename is None:
+        return True, "Please insert file for mutational data"
     if mutational_separator is None:
-        return html.Div("Please select separator for mutational data")
+        return True, "Please select separator for mutational data"
     if mutational_skiprow is None:
-        return html.Div("Please select skiprow for mutational data")
+        return True, "Please select skiprow for mutational data"
     if c_gene is None:
-        return html.Div("Please select column for gene")
+        return True, "Please select column for gene"
     if c_sample_mutation is None:
-        return html.Div("Please select column for sample name on mutation file")
+        return (
+            True,
+            "Please select column for sample name on mutation file",
+        )
     if c_identifier == []:
-        return html.Div("Please select at least one column for mutation identifier")
-    if clinical_patient_data is not None:
+        return (
+            True,
+            "Please select at least one column for mutation identifier",
+        )
+    if clinical_patient_filename is not None:
         if clinical_patient_separator is None:
-            return html.Div("Please select separator for clinical patient data")
+            return True, "Please select separator for clinical patient data"
         if clinical_patient_skiprow is None:
-            return html.Div("Please select skiprow for clinical patient data")
+            return True, "Please select skiprow for clinical patient data"
         if c_patient_name is None:
-            return html.Div("Please select column for patient name")
-    if clinical_sample_data is not None:
+            return True, "Please select column for patient name"
+        if (c_surv_event is None and c_surv_time is not None) or (
+            c_surv_event is not None and c_surv_time is None
+        ):
+            return True, "Please select survival envent and survival time"
+    if clinical_sample_filename is not None:
         if clinical_sample_separator is None:
-            return html.Div("Please select separator for clinical sample data")
+            return True, "Please select separator for clinical sample data"
         if clinical_sample_skiprow is None:
-            return html.Div("Please select skiprow for clinical sample data")
+            return True, "Please select skiprow for clinical sample data"
         if c_sample_name is None:
-            return html.Div(
-                "Please select column for sample name on clinical sample file"
+            return (
+                True,
+                "Please select column for sample name on clinical sample file",
             )
     # CREATE STUDY FOLDER
-    os.makedirs(os.path.join("study", input_namestudy, "input"))
+    Path("study", input_namestudy, "input").mkdir(parents=True, exist_ok=True)
     # MUTATIONAL DATA
-    content_type, content_string = mutational_data.split(",")
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(
-        io.StringIO(decoded.decode("utf-8")),
-        sep=mutational_separator,
-        skiprows=mutational_skiprow,
-        engine="python",
+    Path("temp", mutational_filename[0]).rename(
+        Path("study", input_namestudy, "input", "mutational_data.txt"),
     )
-    df.to_csv(
-        os.path.join("study", input_namestudy, "input", "mutational_data.txt"),
-        sep="\t",
-        index=False,
-    )
+    dialog_message = f"Create study '{input_namestudy}'?"
     # CLINICAL PATIENT
-    if clinical_patient_data is not None:
-        content_type, content_string = clinical_patient_data.split(",")
-        decoded = base64.b64decode(content_string)
-        df = pd.read_csv(
-            io.StringIO(decoded.decode("utf-8")),
-            sep=clinical_patient_separator,
-            skiprows=clinical_patient_skiprow,
-            engine="python",
-        )
-        df.to_csv(
-            os.path.join("study", input_namestudy, "input", "clinical_patient.txt"),
-            sep="\t",
-            index=False,
+    if clinical_patient_filename is not None:
+        Path("temp", clinical_patient_filename[0]).rename(
+            Path("study", input_namestudy, "input", "clinical_patient.txt"),
         )
     # CLINICAL SAMPLE
-    if clinical_sample_data is not None:
-        content_type, content_string = clinical_sample_data.split(",")
-        decoded = base64.b64decode(content_string)
-        df = pd.read_csv(
-            io.StringIO(decoded.decode("utf-8")),
-            sep=clinical_sample_separator,
-            skiprows=clinical_sample_skiprow,
-            engine="python",
-        )
-        df.to_csv(
-            os.path.join("study", input_namestudy, "input", "clinical_sample.txt"),
-            sep="\t",
-            index=False,
+    if clinical_sample_filename is not None:
+        Path("temp", clinical_sample_filename[0]).rename(
+            Path("study", input_namestudy, "input", "clinical_sample.txt"),
         )
     # GENERATE JSON CONFIG
-    DATA = {}
-    DATA["Paths"] = {}
-    DATA["Clinical_data"] = {}
-    DATA["Mutation"] = {}
-
-    DATA["Paths"]["name_study"] = input_namestudy
-    DATA["Paths"]["data_mutational"] = os.path.join(
-        "study", input_namestudy, "input", "mutational_data.txt"
+    config_dict = {}
+    config_dict["paths"] = {}
+    config_dict["clinical_data"] = {}
+    config_dict["mutation"] = {}
+    config_dict["name"] = input_namestudy
+    config_dict["paths"]["data_mutational"] = str(
+        Path(
+            "study",
+            input_namestudy,
+            "input",
+            "mutational_data.txt",
+        ),
     )
-    DATA["Paths"]["data_mutational_sep"] = "\t"
-    DATA["Paths"]["data_mutational_skip"] = 0
-    DATA["Paths"]["data_clinical_patient"] = ""
-    DATA["Paths"]["data_clinical_sample_sep"] = "\t"
-    DATA["Paths"]["data_clinical_sample_skip"] = 0
-    DATA["Paths"]["data_clinical_sample"] = ""
-    DATA["Paths"]["data_clinical_patient_sep"] = "\t"
-    DATA["Paths"]["data_clinical_patient_skip"] = 0
-    DATA["Mutation"]["column_gene"] = c_gene
-    DATA["Mutation"]["column_sample_name"] = c_sample_mutation
+    config_dict["paths"]["data_mutational_sep"] = "\t"
+    config_dict["paths"]["data_mutational_skip"] = 0
+    config_dict["paths"]["data_clinical_patient"] = ""
+    config_dict["paths"]["data_clinical_sample_sep"] = "\t"
+    config_dict["paths"]["data_clinical_sample_skip"] = 0
+    config_dict["paths"]["data_clinical_sample"] = ""
+    config_dict["paths"]["data_clinical_patient_sep"] = "\t"
+    config_dict["paths"]["data_clinical_patient_skip"] = 0
+    config_dict["mutation"]["column_gene"] = c_gene
+    config_dict["mutation"]["column_sample_name"] = c_sample_mutation
     # REMOVE EXTRA SEPARATOR BEFOR JOIN
     c_identifier_clean = [col.replace(";", "") for col in c_identifier]
-    DATA["Mutation"]["identifier_columns"] = ";".join(c_identifier_clean)
-    DATA["Clinical_data"]["column_patient_name"] = ""
-    DATA["Clinical_data"]["column_sample_name"] = ""
-    DATA["Mutation"]["vaf"] = False if vaf_score is None else True
-    DATA["Mutation"]["vaf_score"] = vaf_score
-    DATA["Mutation"]["vaf_column"] = "" if c_vaf is None else c_vaf
-
-    if clinical_patient_data is not None:
-        DATA["Paths"]["data_clinical_patient"] = os.path.join(
-            "study", input_namestudy, "input", "clinical_patient.txt"
+    config_dict["mutation"]["identifier_columns"] = ";".join(
+        c_identifier_clean,
+    )
+    config_dict["clinical_data"]["column_patient_name"] = ""
+    config_dict["clinical_data"]["column_sample_name"] = ""
+    config_dict["clinical_data"]["column_surv_event"] = ""
+    config_dict["clinical_data"]["column_surv_time"] = ""
+    config_dict["mutation"]["vaf_score"] = vaf_score
+    config_dict["mutation"]["vaf_column"] = "" if c_vaf is None else c_vaf
+    if clinical_patient_filename is not None:
+        config_dict["paths"]["data_clinical_patient"] = str(
+            Path(
+                "study",
+                input_namestudy,
+                "input",
+                "clinical_patient.txt",
+            ),
         )
-        DATA["Clinical_data"]["column_patient_name"] = c_patient_name
-    if clinical_sample_data is not None:
-        DATA["Paths"]["data_clinical_sample"] = os.path.join(
-            "study", input_namestudy, "input", "clinical_sample.txt"
+        config_dict["paths"]["data_clinical_patient_skip"] = (
+            clinical_patient_skiprow
         )
-        DATA["Clinical_data"]["column_sample_name"] = c_sample_name
-    path_config = os.path.join("study", input_namestudy, "config.json")
-    with open(path_config, "w") as f:
-        json.dump(DATA, f, indent=4)
+        config_dict["clinical_data"]["column_patient_name"] = c_patient_name
+        if c_surv_time and c_surv_event:
+            config_dict["clinical_data"]["column_surv_event"] = c_surv_event
+            config_dict["clinical_data"]["column_surv_time"] = c_surv_time
+    if clinical_sample_filename is not None:
+        config_dict["paths"]["data_clinical_sample"] = str(
+            Path(
+                "study",
+                input_namestudy,
+                "input",
+                "clinical_sample.txt",
+            ),
+        )
+        config_dict["paths"]["data_clinical_sample_skip"] = (
+            clinical_sample_skiprow
+        )
+        config_dict["clinical_data"]["column_sample_name"] = c_sample_name
+    PATH_CONFIG = Path("study", input_namestudy, "config.json")
+    with PATH_CONFIG.open("w", encoding="utf-8") as f:
+        json.dump(config_dict, f, indent=4)
 
-    print(os.popen(f"python tortoise.py -c {path_config}").read())
-    return html.Div(f"{input_namestudy} -- Study created!")
+    READY_FOR_CREATION = True
+    return True, dialog_message
+
+
+@callback(
+    Output("create-study-log", "children"),
+    Output("confirm-study", "submit_n_clicks"),
+    Output("confirm-study", "cancel_n_clicks"),
+    [
+        Input("confirm-study", "submit_n_clicks"),
+        Input("confirm-study", "cancel_n_clicks"),
+    ],
+    prevent_initial_call=True,
+)
+def confirm_study_prompt(submit_n_clicks, _):
+    global CONTEXT_DATA
+    global PATH_CONFIG
+
+    if not READY_FOR_CREATION:
+        return html.Div(""), 0, 0
+
+    if submit_n_clicks:
+        with conversion.localconverter(default_converter):
+            tortoise(PATH_CONFIG)
+            select_study(CONTEXT_DATA["name_study_input"])
+        return (
+            html.Div(f"Study '{CONTEXT_DATA['name_study_input']}' created!"),
+            0,
+            0,
+        )
+    # Delete temp files
+    study_path = Path("study", CONTEXT_DATA["name_study_input"])
+    for x in study_path.glob("*"):
+        if x.is_dir():
+            for y in x.glob("*"):
+                y.unlink()
+            x.rmdir()
+        else:
+            x.unlink()
+    study_path.rmdir()
+    PATH_CONFIG = None
+    CONTEXT_DATA["name_study_input"] = None
+
+    return html.Div(""), 0, 0
 
 
 # STUDY DESCRIPTION
@@ -948,7 +1198,7 @@ PAGE_STUDY_DESCRIPTION = [
                 lg=6,
             ),
             html.Hr(),
-        ]
+        ],
     ),
     # 1 ROW
     dbc.Row(
@@ -1008,7 +1258,10 @@ PAGE_STUDY_DESCRIPTION = [
                             # NOME SOPRA
                             {
                                 "selector": "node",
-                                "style": {"content": "data(name)", "font-size": "5px"},
+                                "style": {
+                                    "content": "data(name)",
+                                    "font-size": "5px",
+                                },
                             },
                             # PAZIENTI TRIANGOLI ROSSI
                             {
@@ -1041,14 +1294,14 @@ PAGE_STUDY_DESCRIPTION = [
                     # LAYOUT SELECTOR
                     dcc.RadioItems(
                         options=[
-                            "concentric",
                             "cose",
+                            "concentric",
                             "grid",
                             "circle",
                             "breadthfirst",
                             "klay",
-                        ],  # cola
-                        value="concentric",
+                        ],
+                        value="cose",
                         inline=True,
                         id="radio-layouts",
                         persistence=True,
@@ -1065,7 +1318,7 @@ PAGE_STUDY_DESCRIPTION = [
                         id="fig_pie",
                         className="add-border",
                         style={"width": "100%", "height": "35vh"},
-                    )
+                    ),
                 ],
                 lg=6,
             ),
@@ -1083,7 +1336,7 @@ PAGE_STUDY_DESCRIPTION = [
                         id="fig_degree",
                         className="add-border",
                         style={"width": "100%", "height": "35vh"},
-                    )
+                    ),
                 ],
                 lg=8,
             ),
@@ -1098,9 +1351,7 @@ PAGE_STUDY_DESCRIPTION = [
     Output("dd-cluster", "value"),
     Input("dd-cluster", "n_clicks"),
 )
-def dropdpwn_cluster(n_clicks):
-    global CLUSTERS_INDEX
-    global CLUSTER_SELECTED
+def dropdpwn_cluster(_):
     return CLUSTERS_INDEX, CLUSTER_SELECTED
 
 
@@ -1111,7 +1362,7 @@ def dropdpwn_cluster(n_clicks):
     Input("cytoscape-graph", "tapNodeData"),
     prevent_initial_call=True,
 )
-def displaySelectedNodeData(data_dict):
+def display_node_data(data_dict):
     temp = ""
     if data_dict["vertex_type"] == "VARIANT":
         term_included = ["name", "gene", "sost_amm"]
@@ -1177,18 +1428,27 @@ def update_cluster(cluster):
     cluster_elements = filter_graph(cluster)
     # FIGURE PIE
     df_gene = pd.read_csv(
-        os.path.join(OUT_R_PATH, "Gene_Count", f"genes_cluster_{cluster}.csv"),
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "Gene_Count",
+            f"genes_cluster_{cluster}.csv",
+        ),
         sep="\t",
         engine="python",
     )
     fig_pie = px.pie(
-        df_gene, values="COUNT", names="GENE", title="Number Mutation for Gene"
+        df_gene,
+        values="COUNT",
+        names="GENE",
+        title="Number Mutation for Gene",
     )
     fig_pie.update_traces(textposition="inside", textinfo="label")
     # VARIANT NUMBERS
     df_variant = pd.read_csv(
-        os.path.join(
-            OUT_R_PATH, "Variants_Degree", f"variants_degree_cluster{cluster}.csv"
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "Variants_Degree",
+            f"variants_degree_cluster{cluster}.csv",
         ),
         sep="\t",
         engine="python",
@@ -1196,15 +1456,27 @@ def update_cluster(cluster):
     n_variants = len(df_variant)
     # FIGURE DEGREE
     df_variant = df_variant.sort_values(by=["Degree"], ascending=False)[:15]
-    fig_degree = px.bar(df_variant, x="Variants", y="Degree", title="Mutation Degree")
+    fig_degree = px.bar(
+        df_variant,
+        x="Variants",
+        y="Degree",
+        title="Mutation Degree",
+    )
     # PATIENTS NUMBER
     n_patients = len(
-        [1 for e in cluster_elements if e["data"].get("vertex_type", "") == "PATIENT"]
+        [
+            1
+            for e in cluster_elements
+            if e["data"].get("vertex_type", "") == "PATIENT"
+        ],
     )
     # GENE NUMBERS
     n_genes = len(df_gene)
     # VARIANT CENTROID
-    if n_variants > 1 and df_variant.iloc[0]["Degree"] == df_variant.iloc[1]["Degree"]:
+    if (
+        n_variants > 1
+        and df_variant.iloc[0]["Degree"] == df_variant.iloc[1]["Degree"]
+    ):
         variant_centroids = "More than one"
     else:
         variant_centroids = df_variant.iloc[0]["Variants"]
@@ -1252,7 +1524,10 @@ PAGE_PATHWAY_ANALYSIS = [
             # ADJUSTED PVALUE SELECTOR
             dbc.Col(
                 [
-                    html.Span("Use adjusted PValue", className="span_selector"),
+                    html.Span(
+                        "Use adjusted PValue",
+                        className="span_selector",
+                    ),
                     dcc.Dropdown(
                         ["True", "False"],
                         "False",
@@ -1265,7 +1540,7 @@ PAGE_PATHWAY_ANALYSIS = [
                 lg=3,
             ),
             html.Hr(),
-        ]
+        ],
     ),
     # FIRST ROW
     dbc.Row(
@@ -1280,9 +1555,18 @@ PAGE_PATHWAY_ANALYSIS = [
                     ),
                     dcc.RadioItems(
                         options=[
-                            {"label": "Biological Function", "value": "biological"},
-                            {"label": "Molecular Function", "value": "molecular"},
-                            {"label": "Cellular Component", "value": "cellular"},
+                            {
+                                "label": "Biological Function",
+                                "value": "biological",
+                            },
+                            {
+                                "label": "Molecular Function",
+                                "value": "molecular",
+                            },
+                            {
+                                "label": "Cellular Component",
+                                "value": "cellular",
+                            },
                         ],
                         # Valore predefinito
                         value="biological",
@@ -1312,7 +1596,7 @@ PAGE_PATHWAY_ANALYSIS = [
                         id="fig_reactome",
                         className="add-border",
                         style={"width": "100%", "height": "41vh"},
-                    )
+                    ),
                 ],
                 lg=6,
             ),
@@ -1323,13 +1607,43 @@ PAGE_PATHWAY_ANALYSIS = [
                         id="fig_wiki",
                         className="add-border",
                         style={"width": "100%", "height": "41vh"},
-                    )
+                    ),
                 ],
                 lg=6,
             ),
-        ]
+        ],
     ),
 ]
+
+
+def generate_pathway_fig(df, pvalue, adj_pvalue, title):
+    col_name = "P.value"
+    label_name = "Pvalue"
+    if adj_pvalue == "True":
+        col_name = "Adjusted.P.value"
+        label_name = "Adjusted Pvalue"
+    df_data = df[df[col_name] < pvalue]
+    df_data = df_data.sort_values(by=[col_name], ascending=False)[-25:]
+    df_data["Count_gene"] = df_data.apply(
+        lambda e: len(e["Genes"].split(";")),
+        axis=1,
+    )
+    fig = px.bar(
+        df_data,
+        x="Count_gene",
+        y="Term",
+        hover_data=["Overlap"],
+        color=col_name,
+        title=title,
+        labels={col_name: label_name},
+    )
+    fig.update_layout(
+        xaxis_title="Genes_Count",
+        yaxis_title="Terms",
+        legend_title=label_name,
+        coloraxis_colorbar={"exponentformat": "e"},
+    )
+    return fig
 
 
 # UPDATE GO FIGURE
@@ -1342,60 +1656,21 @@ PAGE_PATHWAY_ANALYSIS = [
         Input("radio_fig_go", "value"),
     ],
 )
-def update_go(cluster, pvalue, adjusted_pvalue, process_type):
+def update_go(cluster, pvalue, adj_pvalue, p_type):
     if cluster is None:
         return no_update
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
-    df = pd.read_csv(
-        os.path.join(
-            OUT_R_PATH,
+    df_data = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
             "Arricchimento_all_genes",
             "GO",
-            f"{process_type}_{cluster}.csv",
+            f"{p_type}_{cluster}.csv",
         ),
         engine="python",
     )
-    if adjusted_pvalue == "True":
-        df = df[df["Adjusted.P.value"] < pvalue]
-        df = df.sort_values(by=["Adjusted.P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="Adjusted.P.value",
-            title="GO",
-            labels={"Adjusted.P.value": "Adjusted Pvalue"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",
-            yaxis_title="Terms",
-            legend_title="Adjusted Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
-
-    df = df[df["P.value"] < pvalue]
-    df = df.sort_values(by=["P.value"], ascending=False)[-25:]
-    df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-    fig = px.bar(
-        df,
-        x="Count_gene",
-        y="Term",
-        hover_data=["Overlap"],
-        color="P.value",
-        title="GO",
-        labels={"P.value": "Pvalue"},
-    )
-    fig.update_layout(
-        xaxis_title="Genes_Count",
-        yaxis_title="Terms",
-        legend_title="Pvalue",
-        coloraxis_colorbar={"exponentformat": "e"},
-    )
-    return fig
+    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "GO")
 
 
 # UPDATE KEGG FIGURE
@@ -1407,59 +1682,21 @@ def update_go(cluster, pvalue, adjusted_pvalue, process_type):
         Input("dd-adjusted-pvalue", "value"),
     ],
 )
-def update_kegg(cluster, pvalue, adjusted_pvalue):
+def update_kegg(cluster, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
-    df = pd.read_csv(
-        os.path.join(
-            OUT_R_PATH, "Arricchimento_all_genes", "KEGG", f"kegg_{cluster}.csv"
+    df_data = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "Arricchimento_all_genes",
+            "KEGG",
+            f"kegg_{cluster}.csv",
         ),
         engine="python",
     )
-    if adjusted_pvalue == "True":
-        df = df[df["Adjusted.P.value"] < pvalue]
-        df = df.sort_values(by=["Adjusted.P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="Adjusted.P.value",
-            title="KEGG",
-            color_continuous_scale=px.colors.sequential.Viridis,
-            labels={"P.value": "Adjusted Pvalue"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",  # Nome dell'asse delle x
-            yaxis_title="Terms",
-            legend_title="Adjusted Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
-    else:
-        df = df[df["P.value"] < pvalue]
-        df = df.sort_values(by=["P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="P.value",
-            title="KEGG",
-            color_continuous_scale=px.colors.sequential.Viridis,
-            labels={"P.value": "Pvalue"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",  # Nome dell'asse delle x
-            yaxis_title="Terms",
-            legend_title="Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
+    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "KEGG")
 
 
 # UPDATE REACTOME FIGURE
@@ -1471,62 +1708,21 @@ def update_kegg(cluster, pvalue, adjusted_pvalue):
         Input("dd-adjusted-pvalue", "value"),
     ],
 )
-def update_reactome(cluster, pvalue, adjusted_pvalue):
+def update_reactome(cluster, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
-    df = pd.read_csv(
-        os.path.join(
-            OUT_R_PATH,
+    df_data = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
             "Arricchimento_all_genes",
             "REACTOME",
             f"reactome_{cluster}.csv",
         ),
         engine="python",
     )
-    if adjusted_pvalue == "True":
-        df = df[df["Adjusted.P.value"] < pvalue]
-        df = df.sort_values(by=["Adjusted.P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="Adjusted.P.value",
-            title="REACTOME",
-            color_continuous_scale=px.colors.sequential.Viridis,
-            labels={"P.value": "Adjusted Pvalue"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",  # Nome dell'asse delle x
-            yaxis_title="Terms",
-            legend_title="Adjusted Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
-    else:
-        df = df[df["P.value"] < pvalue]
-        df = df.sort_values(by=["P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="P.value",
-            title="REACTOME",
-            color_continuous_scale=px.colors.sequential.Viridis,
-            labels={"P.value": "Pvalue"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",  # Nome dell'asse delle x
-            yaxis_title="Terms",
-            legend_title="Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
+    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "REACTOME")
 
 
 # UPDATE WIKI FIGURE
@@ -1538,59 +1734,21 @@ def update_reactome(cluster, pvalue, adjusted_pvalue):
         Input("dd-adjusted-pvalue", "value"),
     ],
 )
-def update_wiki(cluster, pvalue, adjusted_pvalue):
+def update_wiki(cluster, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
-    df = pd.read_csv(
-        os.path.join(
-            OUT_R_PATH, "Arricchimento_all_genes", "WIKI", f"wiki_{cluster}.csv"
+    df_data = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "Arricchimento_all_genes",
+            "WIKI",
+            f"wiki_{cluster}.csv",
         ),
         engine="python",
     )
-    if adjusted_pvalue == "True":
-        df = df[df["Adjusted.P.value"] < pvalue]
-        df = df.sort_values(by=["Adjusted.P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="Adjusted.P.value",
-            title="WIKI",
-            color_continuous_scale=px.colors.sequential.Viridis,
-            labels={"Adjusted.P.value": "Adjusted Pvalue", "Overlap": "Overlap_Genes"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",  # Nome dell'asse delle x
-            yaxis_title="Terms",
-            legend_title="Adjusted Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
-    else:
-        df = df[df["P.value"] < pvalue]
-        df = df.sort_values(by=["P.value"], ascending=False)[-25:]
-        df["Count_gene"] = df.apply(lambda e: len(e["Genes"].split(";")), axis=1)
-        fig = px.bar(
-            df,
-            x="Count_gene",
-            y="Term",
-            hover_data=["Overlap"],
-            color="P.value",
-            title="WIKI",
-            color_continuous_scale=px.colors.sequential.Viridis,
-            labels={"P.value": "Pvalue", "Overlap": "Overlap_Genes"},
-        )
-        fig.update_layout(
-            xaxis_title="Genes_Count",  # Nome dell'asse delle x
-            yaxis_title="Terms",
-            legend_title="Pvalue",
-            coloraxis_colorbar={"exponentformat": "e"},
-        )
-        return fig
+    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "WIKI")
 
 
 # CLINICAL DATA
@@ -1615,7 +1773,7 @@ PAGE_CLINICAL_DATA = [
                 lg=6,
             ),
             html.Hr(),
-        ]
+        ],
     ),
     dbc.Row(
         [
@@ -1643,7 +1801,7 @@ PAGE_CLINICAL_DATA = [
                 ],
                 lg=6,
             ),
-        ]
+        ],
     ),
     dbc.Row([dash_table.DataTable(id="table_clinical_data")]),
 ]
@@ -1654,9 +1812,7 @@ PAGE_CLINICAL_DATA = [
     Output("dd-box-1", "value"),
     Input("dd-box-1", "n_clicks"),
 )
-def dropdown_box_fig_1(n_clicks):
-    global ALL_COLUMNS_CLINICAL
-    global BOX_FIG_SELECTED_1
+def dropdown_box_fig_1(_):
     return ALL_COLUMNS_CLINICAL, BOX_FIG_SELECTED_1
 
 
@@ -1665,28 +1821,24 @@ def dropdown_box_fig_1(n_clicks):
     Output("dd-box-2", "value"),
     Input("dd-box-2", "n_clicks"),
 )
-def dropdown_box_fig_2(n_clicks):
-    global ALL_COLUMNS_CLINICAL
-    global BOX_FIG_SELECTED_2
+def dropdown_box_fig_2(_):
     return ALL_COLUMNS_CLINICAL, BOX_FIG_SELECTED_2
 
 
 # SINGLE IMAGE BOX/PIE
-def func_single_plot(cluster, column_name):
+def func_single_plot(cluster, col_name):
     cluster_values = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster][
-        column_name
+        col_name
     ]
 
-    if column_name in NUMERIC_COLUMNS_CLINICAL:
-        fig = px.box(cluster_values, y=column_name)
-        return fig
-    else:
-        _temp_dict = dict(cluster_values.value_counts())
-        _temp_df = pd.DataFrame(
-            {column_name: _temp_dict.keys(), "count": _temp_dict.values()}
-        )
-        fig = px.pie(_temp_df, values="count", names=column_name)
-        return fig
+    if col_name in NUMERIC_COLUMNS_CLINICAL:
+        return px.box(cluster_values, y=col_name)
+
+    _temp_dict = dict(cluster_values.value_counts())
+    _temp_df = pd.DataFrame(
+        {col_name: _temp_dict.keys(), "count": _temp_dict.values()},
+    )
+    return px.pie(_temp_df, values="count", names=col_name)
 
 
 # UPDATE BOX_PLOT_1
@@ -1694,14 +1846,14 @@ def func_single_plot(cluster, column_name):
     Output("fig_box_plot_1", "figure"),
     [Input("dd-cluster", "value"), Input("dd-box-1", "value")],
 )
-def update_box_1(cluster, column_name):
-    if cluster is None or column_name is None:
+def update_box_1(cluster, col_name):
+    if cluster is None or col_name is None:
         return no_update
     global BOX_FIG_SELECTED_1
     global CLUSTER_SELECTED
-    BOX_FIG_SELECTED_1 = column_name
+    BOX_FIG_SELECTED_1 = col_name
     CLUSTER_SELECTED = cluster
-    return func_single_plot(cluster, column_name)
+    return func_single_plot(cluster, col_name)
 
 
 # UPDATE BOX_PLOT_2
@@ -1709,14 +1861,14 @@ def update_box_1(cluster, column_name):
     Output("fig_box_plot_2", "figure"),
     [Input("dd-cluster", "value"), Input("dd-box-2", "value")],
 )
-def update_box_2(cluster, column_name):
-    if cluster is None or column_name is None:
+def update_box_2(cluster, col_name):
+    if cluster is None or col_name is None:
         return no_update
     global BOX_FIG_SELECTED_2
     global CLUSTER_SELECTED
-    BOX_FIG_SELECTED_2 = column_name
+    BOX_FIG_SELECTED_2 = col_name
     CLUSTER_SELECTED = cluster
-    return func_single_plot(cluster, column_name)
+    return func_single_plot(cluster, col_name)
 
 
 # TABLE CLINICAL_DATA:
@@ -1752,7 +1904,7 @@ PAGE_SURVIVAL_ANALYSIS = [
                 lg=6,
             ),
             html.Hr(),
-        ]
+        ],
     ),
     dbc.Row(
         [
@@ -1762,7 +1914,7 @@ PAGE_SURVIVAL_ANALYSIS = [
                         id="survival_figure",
                         className="add-border",
                         style={"width": "100%", "height": "38vh"},
-                    )
+                    ),
                 ],
                 lg=8,
             ),
@@ -1772,18 +1924,21 @@ PAGE_SURVIVAL_ANALYSIS = [
                         id="survival_figure_stat",
                         className="add-border",
                         style={"width": "100%", "height": "38vh"},
-                    )
+                    ),
                 ],
                 lg=4,
             ),
-        ]
+        ],
     ),
     dbc.Row(
         [
             # CLUSTER SELECTOR MULTI
             dbc.Col(
                 [
-                    html.Span("Multi Cluster Selection", className="span_selector"),
+                    html.Span(
+                        "Multi Cluster Selection",
+                        className="span_selector",
+                    ),
                     dcc.Dropdown(
                         id="dd-cluster-multi",
                         multi=True,
@@ -1793,7 +1948,7 @@ PAGE_SURVIVAL_ANALYSIS = [
                 lg=4,
             ),
             html.Hr(),
-        ]
+        ],
     ),
     dbc.Row(
         [
@@ -1803,7 +1958,7 @@ PAGE_SURVIVAL_ANALYSIS = [
                         id="survival_figure_comparison",
                         className="add-border",
                         style={"width": "100%", "height": "38vh"},
-                    )
+                    ),
                 ],
                 lg=8,
             ),
@@ -1813,11 +1968,11 @@ PAGE_SURVIVAL_ANALYSIS = [
                         id="table_test_survival",
                         className="add-border",
                         style={"width": "100%", "height": "38vh"},
-                    )
+                    ),
                 ],
                 lg=4,
             ),
-        ]
+        ],
     ),
 ]
 
@@ -1827,10 +1982,8 @@ PAGE_SURVIVAL_ANALYSIS = [
     Output("dd-cluster-multi", "value"),
     Input("dd-cluster-multi", "n_clicks"),
 )
-def dropdpwn_multi_cluster(n_clicks):
-    global CLUSTERS_INDEX
-    global CLUSTER_SELECTED_MULTI
-    return ["ALL"] + CLUSTERS_INDEX, CLUSTER_SELECTED_MULTI
+def dropdpwn_multi_cluster(_):
+    return ["ALL", *CLUSTERS_INDEX], CLUSTER_SELECTED_MULTI
 
 
 # SURVIVAL_PLOT
@@ -1844,19 +1997,21 @@ def update_overall_survival(cluster):
     if cluster is None:
         return no_update, no_update
     CLUSTER_SELECTED = cluster
-    # FIXME hardcoded name column
-    col_status = "VITAL_STATUS"
-    column_name_month = "OS_INT"
+    col_surv_time = CONTEXT_DATA["config"]["clinical_data"]["column_surv_time"]
+    col_surv_event = CONTEXT_DATA["config"]["clinical_data"][
+        "column_surv_event"
+    ]
     data = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
-    data.dropna(subset=[column_name_month, col_status], inplace=True)
+    data = data.dropna(subset=[col_surv_time, col_surv_event])
     if len(data) <= 0:
         return no_update, no_update
-    data[col_status] = data[col_status].replace({"Yes": 1, "No": 0})
+    data[col_surv_event] = data[col_surv_event].replace({"Yes": 1, "No": 0})
     kmf = KaplanMeierFitter()
-    kmf.fit(data[column_name_month].values, event_observed=data[col_status].values)
-    # Crea il grafico della curva di sopravvivenza con Plotly
+    kmf.fit(
+        data[col_surv_time].values,
+        event_observed=data[col_surv_event].values,
+    )
     fig = go.Figure()
-    # Aggiungi la curva di sopravvivenza
     fig.add_trace(
         go.Scatter(
             x=kmf.confidence_interval_.index,
@@ -1864,7 +2019,7 @@ def update_overall_survival(cluster):
             mode="lines",
             line={"shape": "hv", "width": 0},
             showlegend=False,
-        )
+        ),
     )
     fig.add_trace(
         go.Scatter(
@@ -1875,13 +2030,12 @@ def update_overall_survival(cluster):
             fill="tonexty",
             fillcolor="rgb(153,204,255)",
             showlegend=False,
-        )
+        ),
     )
     fig.update_layout(
         title=f"Kaplan-Meier Curve Cluster: {cluster}",
         xaxis_title="Duration",
         yaxis_title="Survival probability",
-        # margin=dict(r=0, t=10, l=0),
         font_size=14,
         xaxis_title_font_size=18,
         yaxis_title_font_size=18,
@@ -1893,12 +2047,15 @@ def update_overall_survival(cluster):
             line={"shape": "hv", "width": 3, "color": "rgb(0,0,128)"},
             mode="lines",
             showlegend=False,
-        )
+        ),
     )
     # STAT PIE
-    fig_stat = func_single_plot(cluster, col_status)
+    fig_stat = func_single_plot(cluster, col_surv_event)
     fig_stat.update_layout(
-        {"title": f"Vital Status Cluster: {cluster}", "legend_title": "Alive"}
+        {
+            "title": f"Vital Status Cluster: {cluster}",
+            "legend_title": "Alive",
+        },
     )
     return fig, fig_stat
 
@@ -1910,32 +2067,35 @@ def update_overall_survival(cluster):
 )
 def update_survival_comparison(list_clusters):
     global CLUSTER_SELECTED_MULTI
-    if len(list_clusters) < 2:
+    min_cluster = 2
+    if len(list_clusters) < min_cluster:
         return no_update, no_update
     CLUSTER_SELECTED_MULTI = list_clusters
     fig = go.Figure()
     fig_stats = None
     kmf = KaplanMeierFitter()
-    # FIXME hardcoded name column
-    col_status = "VITAL_STATUS"
-    column_name_month = "OS_INT"
+    col_surv_time = CONTEXT_DATA["config"]["clinical_data"]["column_surv_time"]
+    col_surv_event = CONTEXT_DATA["config"]["clinical_data"][
+        "column_surv_event"
+    ]
+    df_clinical = DF_CLINICAL_DATA[
+        DF_CLINICAL_DATA["cluster"].isin(list_clusters)
+    ]
+    df_clinical = df_clinical.dropna(subset=[col_surv_time, col_surv_event])
+    df_clinical[col_surv_event] = df_clinical[col_surv_event].replace(
+        {"Yes": 1, "No": 0},
+    )
 
-    DF = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"].isin(list_clusters)]
-    DF.dropna(subset=[column_name_month, col_status], inplace=True)
-    DF[col_status] = DF[col_status].replace({"Yes": 1, "No": 0})
-
-    for cluster in list(DF["cluster"].unique()):
-        cluster_data = DF[DF["cluster"] == cluster]
+    for cluster in list(df_clinical["cluster"].unique()):
+        cluster_data = df_clinical[df_clinical["cluster"] == cluster]
         if len(cluster_data) == 0:
             list_clusters.remove(cluster)
         else:
-            # Fit e plot della curva di sopravvivenza
             kmf.fit(
-                cluster_data[column_name_month],
-                event_observed=cluster_data[col_status],
+                cluster_data[col_surv_time],
+                event_observed=cluster_data[col_surv_event],
                 label=f"Cluster {cluster}",
             )
-            # kmf.plot_survival_function(ci_show=True)
             fig.update_layout(
                 title="Kaplan-Meier Curve",
                 xaxis_title="Duration",
@@ -1952,16 +2112,18 @@ def update_survival_comparison(list_clusters):
                     mode="lines",
                     name=f"Cluster {cluster}",
                     showlegend=True,
-                )
+                ),
             )
 
     if len(list_clusters) <= 1:
         return no_update, no_update
 
-    DF["cluster_str"] = DF["cluster"].astype(str)
-    # Test log-rank per confrontare le curve tra tutti i cluster
+    df_clinical["cluster_str"] = df_clinical["cluster"].astype(str)
+    # Test log-rank
     results = pairwise_logrank_test(
-        DF[column_name_month], DF["cluster_str"], DF[col_status]
+        df_clinical[col_surv_time],
+        df_clinical["cluster_str"],
+        df_clinical[col_surv_event],
     )
     df_res = results.summary
     df_res = df_res.rename(columns={"-log2(p)": "log2_p"})
@@ -1969,7 +2131,7 @@ def update_survival_comparison(list_clusters):
     df_res["comparison"] = (
         df_res["level_0"].astype(str) + " " + df_res["level_1"].astype(str)
     )
-    # Rimuovi le colonne level_0 e level_1, se non necessarie
+    # remove col level_0 e level_1
     df_res = df_res.drop(columns=["level_0", "level_1"])
     fig_stats = go.Figure(
         data=[
@@ -1989,8 +2151,8 @@ def update_survival_comparison(list_clusters):
                     "fill_color": "lavender",
                     "align": "left",
                 },
-            )
-        ]
+            ),
+        ],
     )
     return fig, fig_stats
 
@@ -2010,7 +2172,7 @@ PAGE_CLUSTER_COMPARISION = [
                 lg=4,
             ),
             html.Hr(),
-        ]
+        ],
     ),
     # COL VENN
     dbc.Row(
@@ -2021,7 +2183,7 @@ PAGE_CLUSTER_COMPARISION = [
                         id="plot-venn",
                         className="add-border",
                         style={"width": "100%", "height": "80vh"},
-                    )
+                    ),
                 ],
                 lg=6,
             ),
@@ -2034,14 +2196,14 @@ PAGE_CLUSTER_COMPARISION = [
                     ),
                     dcc.Dropdown(id="dd-box-1"),
                     dcc.Graph(
-                        id="fig_multi_fig1",
+                        id="fig_multi_fig",
                         className="add-border",
                         style={"width": "100%", "height": "38vh"},
                     ),
                 ],
                 lg=6,
             ),
-        ]
+        ],
     ),
 ]
 
@@ -2050,7 +2212,8 @@ PAGE_CLUSTER_COMPARISION = [
 @callback(Output("plot-venn", "src"), Input("dd-cluster-multi", "value"))
 def update_venn(list_clusters):
     global CLUSTER_SELECTED_MULTI
-    if len(list_clusters) < 2:
+    min_cluster = 2
+    if len(list_clusters) < min_cluster:
         return no_update
     CLUSTER_SELECTED_MULTI = list_clusters
 
@@ -2059,16 +2222,23 @@ def update_venn(list_clusters):
         gene_values = []
         if index == "ALL":
             gene_values = pd.read_csv(
-                os.path.join(OUT_R_PATH, "distribution_gene_cluster.csv"),
+                Path(
+                    CONTEXT_DATA["out_root_path"],
+                    "distribution_gene_cluster.csv",
+                ),
                 sep="\t",
                 engine="python",
             )["Gene"].unique()
         else:
             gene_values = pd.read_csv(
-                os.path.join(OUT_R_PATH, "Gene_Count", f"genes_cluster_{index}.csv"),
+                Path(
+                    CONTEXT_DATA["out_root_path"],
+                    "Gene_Count",
+                    f"genes_cluster_{index}.csv",
+                ),
                 sep="\t",
                 engine="python",
-            )["GENE"].values
+            )["GENE"].to_numpy()
         cluster_gene_list.append(gene_values)
     labels = venn.get_labels(cluster_gene_list, fill=["number"])
 
@@ -2082,8 +2252,6 @@ def update_venn(list_clusters):
             fig, ax = venn.venn4(labels, names=list_clusters, figsize=(10, 10))
         case 5:
             fig, ax = venn.venn5(labels, names=list_clusters, figsize=(10, 10))
-        case 6:
-            fig, ax = venn.venn6(labels, names=list_clusters, figsize=(10, 10))
         case _:
             return no_update
 
@@ -2104,7 +2272,8 @@ def update_venn(list_clusters):
 @callback(Output("tbl_g_common", "figure"), Input("dd-cluster-multi", "value"))
 def update_genes_common(list_clusters):
     global CLUSTER_SELECTED_MULTI
-    if len(list_clusters) < 2:
+    min_cluster = 2
+    if len(list_clusters) < min_cluster:
         return no_update
     CLUSTER_SELECTED_MULTI = list_clusters
 
@@ -2115,37 +2284,44 @@ def update_genes_common(list_clusters):
         if index == "ALL":
             gene_values = list(
                 pd.read_csv(
-                    os.path.join(OUT_R_PATH, "distribution_gene_cluster.csv"),
+                    Path(
+                        CONTEXT_DATA["out_root_path"],
+                        "distribution_gene_cluster.csv",
+                    ),
                     sep="\t",
                     engine="python",
-                )["Gene"].unique()
+                )["Gene"].unique(),
             )
             cluster_gene_list["ALL"] = gene_values
         else:
             gene_values = list(
                 pd.read_csv(
-                    os.path.join(
-                        OUT_R_PATH, "Gene_Count", f"genes_cluster_{index}.csv"
+                    Path(
+                        CONTEXT_DATA["out_root_path"],
+                        "Gene_Count",
+                        f"genes_cluster_{index}.csv",
                     ),
                     sep="\t",
                     engine="python",
-                )["GENE"].unique()
+                )["GENE"].unique(),
             )
             cluster_gene_list[index] = gene_values
         all_gene_set.update(gene_values)
 
-    df = pd.DataFrame({"gene": list(all_gene_set)})
+    df_genes = pd.DataFrame({"gene": list(all_gene_set)})
     for cluster, genes in cluster_gene_list.items():
-        df[cluster] = df["gene"].apply(lambda x: "🟢" if x in genes else "🔴")
+        df_genes[cluster] = df_genes["gene"].apply(
+            lambda x, g=genes: "🟢" if x in g else "🔴",
+        )
 
-    df = df.sort_values(by=list_clusters, ascending=False)
-    values = [df["gene"].values]
+    df_genes = df_genes.sort_values(by=list_clusters, ascending=False)
+    values = [df_genes["gene"].to_numpy()]
     c_name = ["Gene"]
     for i in list_clusters:
         c_name.append(f"Cluster {i}")
-        values.append(df[i])
+        values.append(df_genes[i])
 
-    fig = go.Figure(
+    return go.Figure(
         data=[
             go.Table(
                 header={
@@ -2153,23 +2329,29 @@ def update_genes_common(list_clusters):
                     "fill_color": "paleturquoise",
                     "align": "left",
                 },
-                cells={"values": values, "fill_color": "lavender", "align": "left"},
-            )
-        ]
+                cells={
+                    "values": values,
+                    "fill_color": "lavender",
+                    "align": "left",
+                },
+            ),
+        ],
     )
-    return fig
 
 
 # MULTI IMAGE BOX/PIE
-def func_multi_plot(list_clusters, column_name):
+def func_multi_plot(list_clusters: list, col_name: str):
     fig = None
-    # Controllo dati
-    df = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"].isin(list_clusters)]
-    df.dropna(subset=[column_name], inplace=True)
-    df["cluster_plot"] = df["cluster"].apply(lambda x: f"cluster_{x}")
+    df_clinical = DF_CLINICAL_DATA[
+        DF_CLINICAL_DATA["cluster"].isin(list_clusters)
+    ]
+    df_clinical = df_clinical.dropna(subset=[col_name])
+    df_clinical["cluster_plot"] = df_clinical["cluster"].apply(
+        lambda x: f"cluster_{x}",
+    )
 
-    if column_name in NUMERIC_COLUMNS_CLINICAL:
-        fig = tap.plot_stats(df, "cluster_plot", column_name)
+    if col_name in NUMERIC_COLUMNS_CLINICAL:
+        fig = tap.plot_stats(df_clinical, "cluster_plot", col_name)
     else:
         fig = make_subplots(
             1,
@@ -2178,7 +2360,9 @@ def func_multi_plot(list_clusters, column_name):
             specs=[[{"type": "domain"} for e in list_clusters]],
         )
         for i, index in enumerate(list_clusters):
-            _cluster_values = df[df["cluster"] == index][column_name]
+            _cluster_values = df_clinical[df_clinical["cluster"] == index][
+                col_name
+            ]
             _temp_dict = dict(_cluster_values.value_counts())
             fig.add_trace(
                 go.Pie(
@@ -2194,20 +2378,20 @@ def func_multi_plot(list_clusters, column_name):
 
 # UPDATE MULTI FIG1
 @callback(
-    Output("fig_multi_fig1", "figure"),
+    Output("fig_multi_fig", "figure"),
     [Input("dd-cluster-multi", "value"), Input("dd-box-1", "value")],
 )
-def update_multi_fig1(list_clusters, column_name):
+def update_multi_fig(list_clusters: list, col_name: str):
     global CLUSTER_SELECTED_MULTI
     global BOX_FIG_SELECTED_1
-    if len(list_clusters) < 2 or column_name is None:
+    min_cluster = 2
+    if len(list_clusters) < min_cluster or col_name is None:
         return no_update
     CLUSTER_SELECTED_MULTI = list_clusters
-    BOX_FIG_SELECTED_1 = column_name
-    return func_multi_plot(list_clusters, column_name)
+    BOX_FIG_SELECTED_1 = col_name
+    return func_multi_plot(list_clusters, col_name)
 
 
 # START
 if __name__ == "__main__":
-    print(f"{APP_NAME} ready on: http://127.0.0.1:8593")
-    APP.run(debug=False, host="0.0.0.0", port=8593)
+    APP.run(debug=False, host="127.0.0.1", port=8593)

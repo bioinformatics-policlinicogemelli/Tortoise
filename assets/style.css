@@ -119,18 +119,6 @@
 .markdown {
   white-space: pre;
 }
-.upload-button {
-  text-align: center;
-  width: "80%";
-  height: "90%";
-  border-width: "2px";
-  border-style: dashed;
-  border-radius: 5px;
-  background-color: var(--color-5);
-}
-.upload-button:hover {
-  cursor: pointer;
-}
 .create_study_log {
   font-size: 2rem;
   text-align: center;
@@ -141,4 +129,19 @@
   border-style: solid;
   border-color:  var(--color-5);
   border-radius: 5px;
+}
+.dd_study_header {
+  font-size: 2rem;
+  text-align: center;
+  color: var(--color-1);
+  background-color: var(--color-3);
+}
+.dd_study_infos {
+  font-size: 2rem;
+}
+.homepage_logo {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 10%;
 }

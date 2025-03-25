@@ -89,3 +89,10 @@ There are 2 principale sections
 
 * **Cluster Comparison**: In this page it's possibile to make a comparison between cluster. For numerical parameter, a statistical test is performed to view if there are significant statistical difference.
 
+### Linting & Formatting
+
+This project is formatted using black and isort.
+
+The Python best practices are followed with the help of the linters mypy, flake8, and pylint.
+
+Unreachable and unused code is detected using vulture.

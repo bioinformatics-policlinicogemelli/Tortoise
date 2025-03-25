@@ -1,6 +1,5 @@
-"""
-This module processes mutational and clinical data,
-creates graphs, and performs clustering and enrichment analysis.
+#!/usr/bin/env python3
+"""Module taht creates graphs and performs clustering and enrichment analysis.
 
 Functions:
     load_df(config): Loads mutational and clinical data from CSV files.
@@ -15,17 +14,25 @@ Usage:
 
 import argparse
 import json
-import os
+import logging
+from pathlib import Path
 
 import lib.lib_utils as libu
 
+logger = logging.getLogger("tortoise")
+logging.basicConfig(
+    format="%(asctime)s %(name)s -- %(levelname)s:%(message)s",
+    level=logging.DEBUG,
+    datefmt="%Y-%m-%d %H:%M:%S",
+    encoding="utf-8",
+)
 
-def main(path_config):
-    """
-    Main function to process mutational and clinical data,
-    create graphs, and perform clustering and enrichment analysis.
+
+def main(path_config: Path) -> None:
+    """Create graphs, and perform clustering and enrichment analysis.
+
     Args:
-        path_config (str): Path to the configuration file in JSON format.
+        path_config (Path): Path to the configuration file in JSON format.
     The function performs the following steps:
     1. Loads the configuration file.
     2. Defines paths and loads mutational and clinical data.
@@ -36,84 +43,106 @@ def main(path_config):
     7. Saves the g and generates summary information.
     8. Counts gene mutations and creates distribution maps.
     9. Performs enrichment analysis using an R script.
-    """
 
+    """
     # load config file
-    with open(path_config, mode="r", encoding="utf-8") as f:
+    logger.info("  0% -- Start tortoise")
+    with Path(path_config).open(mode="r", encoding="utf-8") as f:
         config = json.load(f)
-    path_save = os.path.join("study", config["Paths"]["name_study"], "output")
-    identifier_columns = config["Mutation"]["identifier_columns"].split(";")
+    path_save = Path("study", config["name"], "output")
+    identifier_columns = config["mutation"]["identifier_columns"].split(";")
     column_mutation_name = None
-    os.makedirs(path_save, exist_ok=True)
+    Path(path_save).mkdir(parents=True, exist_ok=True)
     # load df
+    logger.info(" 10% -- Load files")
     df_mut, data_clinical_sample, data_clinical_patient = libu.load_df(config)
-    # creazione delle mappe pazienti e varianti + creazione del grafo
+    # create maps and graph
+    logger.info(" 20% -- Add category mutations")
     if len(identifier_columns) > 1:
         df_mut = libu.adding_category_mutation(df_mut, identifier_columns)
         column_mutation_name = "TN_mutation_label"
     else:
         column_mutation_name = identifier_columns[0]
-    # filtraggio della VAF
-    if config["Mutation"]["vaf"]:
+    # VAF filter
+    if config["mutation"]["vaf_score"]:
         config, df_mut = libu.filter_vaf(config, df_mut)
+    logger.info(" 30% -- Create maps")
     map_patients, map_variants = libu.create_maps(
         df_mut,
         column_mutation_name,
-        config["Mutation"]["column_gene"],
-        config["Mutation"]["column_sample_name"],
-        config["Mutation"]["vaf"],
-        config["Mutation"]["vaf_column"],
+        config["mutation"]["column_gene"],
+        config["mutation"]["column_sample_name"],
+        config["mutation"]["vaf_score"],
+        config["mutation"]["vaf_column"],
     )
-    # clusterizzazione
+    # cluster
+    logger.info(" 40% -- Create graph")
     g = libu.graph_creation(map_patients, map_variants)
+    logger.info(" 50% -- Clustering")
     dendro = libu.leiden_clustering(g, libu.selected_seed(g))
-    # gestione parte grafica del grafo (aggiunta colori + file per cytoscape)
+    with Path(path_save, "modularity.info").open("w") as f:
+        f.write(str(round(dendro.modularity, 4)))
+    # graph add colors + cytoscape
     g = libu.adding_graph_color(g, dendro)
-    # creazione della mappa cluster
+    # map cluster
+    logger.info(" 60% -- Create map cluster")
     map_c = libu.map_cluster_creation(g, dendro)
     map_patients, map_variants = libu.adding_cluster_to_map(
-        map_c, map_patients, map_variants
+        map_c,
+        map_patients,
+        map_variants,
     )
+    logger.info(" 70% -- Add metadata")
     g = libu.cluster_noded_attributes(g, map_patients, map_variants)
-    # aggiunta delle informazioni cliniche alla mappa dei pazienti
+    # add info
     if data_clinical_sample is not None:
         map_patients = libu.enriched_sample_data(
             data_clinical_sample,
             map_patients,
-            config["Clinical_data"]["column_sample_name"],
+            config["clinical_data"]["column_sample_name"],
         )
     if data_clinical_patient is not None:
         map_patients = libu.enriched_patient_data(
             data_clinical_patient,
             map_patients,
-            config["Clinical_data"]["column_patient_name"],
+            config["clinical_data"]["column_patient_name"],
         )
     g = libu.adding_clinical_info_graph(g, map_patients)
+    logger.info(" 80% -- Export infos")
     libu.save_graph_to_file(g, path_save)
-    # creazione file in cui riassumere le informazioni
+    # create inofo files
     libu.summary_info(
-        g, map_c, config["Clinical_data"]["column_patient_name"], path_save
+        g,
+        map_c,
+        config["clinical_data"]["column_patient_name"],
+        path_save,
     )
     libu.numerosity_info(g, map_c, path_save)
-    # creazione di una mappa con il numero di mutazioni per ogni gene
-    # creazione di due mappe con i valori assoluti e
-    # percentuali di distribuzione delle mutazioni, per ciascun gene
+    # stats
     map_cluster_gene_abs, _ = libu.count_gene_abs_percent(
-        g, map_c, libu.count_gene(g), path_save
+        g,
+        map_c,
+        libu.count_gene(g),
+        path_save,
     )
-    # percentuali di distribuzione delle mutazioni dei diversi geni nei cluster
     libu.genes_single_cluster(g, map_c, path_save)
     libu.genes_count_mutation_single_cluster(map_cluster_gene_abs, path_save)
     libu.creation_cluster_clinical_data(map_patients, path_save)
     libu.centroids_cluster(dendro, path_save)
     libu.degree_variant_cluster(map_c, g, path_save)
+    # enrichment
+    logger.info(" 90% -- Enrichment")
     libu.enrichment_with_r(path_save, map_c)
+    logger.info("100% -- Done")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-v", "--verbose", help="increase verbosity", action="store_true"
+        "-v",
+        "--verbose",
+        help="increase verbosity",
+        action="store_true",
     )
     parser.add_argument("-c", "--config", type=str, required=True)
-    main(parser.parse_args().config)
+    main(Path(parser.parse_args().config))

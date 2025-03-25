@@ -3,3 +3,6 @@ study
 __pycache__
 lf.sh
 .mypy_cache
+.pytype
+.ruff_cache
+temp
