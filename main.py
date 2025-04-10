@@ -1077,7 +1077,7 @@ def create_study(
         ),
     )
     config_dict["paths"]["data_mutational_sep"] = "\t"
-    config_dict["paths"]["data_mutational_skip"] = 0
+    config_dict["paths"]["data_mutational_skip"] = mutational_skiprow
     config_dict["paths"]["data_clinical_patient"] = ""
     config_dict["paths"]["data_clinical_sample_sep"] = "\t"
     config_dict["paths"]["data_clinical_sample_skip"] = 0
@@ -2394,5 +2394,4 @@ def update_multi_fig(list_clusters: list, col_name: str):
 
 # START
 if __name__ == "__main__":
-    #APP.run(debug=False, host="127.0.0.1", port=8593)
     APP.run(debug=False, host="0.0.0.0", port=8593)
