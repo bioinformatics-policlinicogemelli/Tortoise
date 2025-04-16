@@ -351,21 +351,19 @@ def process_data(args):
     g = args[0]
     _seed = args[1]
     random.seed(_seed)
+    np.random.seed(_seed)
     _dendro_2 = g.community_leiden(objective_function="modularity")
     return _dendro_2.modularity
 
 
 # SELEZIONE DEL SEED CHE Dà VALORE DI MODULARITà PIù ALTA A SEGUITO DEL LEIDEN ALGORITHM
-def selected_seed(g):
+def selected_seed(g, seed_trials):
     mod_results = []
+    data = [(g, s) for s in range(seed_trials)]
     if sys.platform.startswith("win") or sys.platform.startswith("linux"):
-        data = [(g, s) for s in range(10000)]
         with Pool() as p:
             mod_results = p.map(process_data, data)
     else:
-        data = []
-        for s in range(1000):
-            data.append((g, s))
         for s in data:
             mod_results.append(process_data(s))
 

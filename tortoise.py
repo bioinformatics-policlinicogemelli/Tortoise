@@ -79,9 +79,11 @@ def main(path_config: Path) -> None:
     logger.info(" 40% -- Create graph")
     g = libu.graph_creation(map_patients, map_variants)
     logger.info(" 50% -- Clustering")
-    dendro = libu.leiden_clustering(g, libu.selected_seed(g))
+    best_seed = libu.selected_seed(g, config["seed_trials"])
+    dendro = libu.leiden_clustering(g, best_seed)
     with Path(path_save, "modularity.info").open("w") as f:
         f.write(str(round(dendro.modularity, 4)))
+    logger.info(f" best seed: {best_seed} -- modularity: {round(dendro.modularity, 4)}")
     # graph add colors + cytoscape
     g = libu.adding_graph_color(g, dendro)
     # map cluster

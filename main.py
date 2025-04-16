@@ -94,7 +94,6 @@ from plotly.subplots import make_subplots
 from rpy2.robjects import conversion, default_converter
 
 from lib import venn
-from tortoise import main as tortoise
 
 # Config lib
 mpl.use("agg")
@@ -537,6 +536,28 @@ PAGE_CREATE_STUDY = [
             ),
         ],
     ),
+    # NAME STUDY
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("Seed trials:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        [5_000, 10_000, 25_000, 50_000, 100_000, 500_000],
+                        placeholder=10_000,
+                        id="seed-trials",
+                        style={"width": "100%"},
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
     # DATA MUTATIONAL
     dbc.Row(
         [
@@ -971,6 +992,7 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     State("dd-identifier-columns", "value"),
     State("dd-vaf", "value"),
     State("input-vaf-score", "value"),
+    State("seed-trials", "value"),
     prevent_initial_call=True,
 )
 def create_study(
@@ -994,6 +1016,7 @@ def create_study(
     c_identifier,
     c_vaf,
     vaf_score,
+    seed_trials
 ):
     global CONTEXT_DATA
     global PATH_CONFIG
@@ -1045,6 +1068,8 @@ def create_study(
                 True,
                 "Please select column for sample name on clinical sample file",
             )
+    if seed_trials is None:
+        seed_trials = 10_000
     # CREATE STUDY FOLDER
     Path("study", input_namestudy, "input").mkdir(parents=True, exist_ok=True)
     # MUTATIONAL DATA
@@ -1086,6 +1111,7 @@ def create_study(
     config_dict["paths"]["data_clinical_patient_skip"] = 0
     config_dict["mutation"]["column_gene"] = c_gene
     config_dict["mutation"]["column_sample_name"] = c_sample_mutation
+    config_dict["seed_trials"] = seed_trials
     # REMOVE EXTRA SEPARATOR BEFOR JOIN
     c_identifier_clean = [col.replace(";", "") for col in c_identifier]
     config_dict["mutation"]["identifier_columns"] = ";".join(
@@ -1153,7 +1179,7 @@ def confirm_study_prompt(submit_n_clicks, _):
 
     if submit_n_clicks:
         with conversion.localconverter(default_converter):
-            tortoise(PATH_CONFIG)
+            os.popen(f"python tortoise.py -c {PATH_CONFIG}").read()
             select_study(CONTEXT_DATA["name_study_input"])
         return (
             html.Div(f"Study '{CONTEXT_DATA['name_study_input']}' created!"),
