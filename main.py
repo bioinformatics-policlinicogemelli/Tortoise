@@ -1456,8 +1456,8 @@ def update_cluster(cluster):
     df_gene = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
-            "Gene_Count",
-            f"genes_cluster_{cluster}.csv",
+            "count_cluster_list",
+            f"count_cluster_{cluster}.csv",
         ),
         sep="\t",
         engine="python",
@@ -1473,8 +1473,8 @@ def update_cluster(cluster):
     df_variant = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
-            "Variants_Degree",
-            f"variants_degree_cluster{cluster}.csv",
+            "variants_degree",
+            f"variants_degree_cluster_{cluster}.csv",
         ),
         sep="\t",
         engine="python",
@@ -1690,7 +1690,7 @@ def update_go(cluster, pvalue, adj_pvalue, p_type):
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
-            "Arricchimento_all_genes",
+            "pathway_analysis",
             "GO",
             f"{p_type}_{cluster}.csv",
         ),
@@ -1716,7 +1716,7 @@ def update_kegg(cluster, pvalue, adj_pvalue):
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
-            "Arricchimento_all_genes",
+            "pathway_analysis",
             "KEGG",
             f"kegg_{cluster}.csv",
         ),
@@ -1742,7 +1742,7 @@ def update_reactome(cluster, pvalue, adj_pvalue):
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
-            "Arricchimento_all_genes",
+            "pathway_analysis",
             "REACTOME",
             f"reactome_{cluster}.csv",
         ),
@@ -1768,7 +1768,7 @@ def update_wiki(cluster, pvalue, adj_pvalue):
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
-            "Arricchimento_all_genes",
+            "pathway_analysis",
             "WIKI",
             f"wiki_{cluster}.csv",
         ),
@@ -2259,8 +2259,8 @@ def update_venn(list_clusters):
             gene_values = pd.read_csv(
                 Path(
                     CONTEXT_DATA["out_root_path"],
-                    "Gene_Count",
-                    f"genes_cluster_{index}.csv",
+                    "count_cluster_list",
+                    f"count_cluster_{index}.csv",
                 ),
                 sep="\t",
                 engine="python",
@@ -2324,8 +2324,8 @@ def update_genes_common(list_clusters):
                 pd.read_csv(
                     Path(
                         CONTEXT_DATA["out_root_path"],
-                        "Gene_Count",
-                        f"genes_cluster_{index}.csv",
+                        "count_cluster_list",
+                        f"count_cluster_{index}.csv",
                     ),
                     sep="\t",
                     engine="python",

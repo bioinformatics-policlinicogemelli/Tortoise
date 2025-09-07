@@ -5,4 +5,6 @@ lf.sh
 .mypy_cache
 .pytype
 .ruff_cache
+.Rhistory
 temp
+TODO

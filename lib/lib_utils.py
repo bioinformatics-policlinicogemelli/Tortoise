@@ -200,8 +200,8 @@ def enrichment_with_r(path_save, map_cluster) -> None:
     robjects.r.source("./lib/enrichment.r")
     # R functions
     r_func = robjects.globalenv["all_analisi"]
-    g_path = Path(path_save, "Gene")
-    o_path = Path(path_save, "Arricchimento_all_genes")
+    g_path = Path(path_save, "gene_cluster_list")
+    o_path = Path(path_save, "pathway_analysis")
     Path(o_path, "GO").mkdir(parents=True, exist_ok=True)
     Path(o_path, "KEGG").mkdir(parents=True, exist_ok=True)
     Path(o_path, "WIKI").mkdir(parents=True, exist_ok=True)
@@ -401,7 +401,7 @@ def adding_graph_color(graph, dendro):
 
 # function to save graph as graphml file for cytoscape
 def save_graph_to_file(graph, path_save) -> None:
-    graph.write_graphml(f"{path_save}/grafo_cytoscape.graphml")
+    graph.write_graphml(f"{path_save}/graph_cytoscape.graphml")
     np.save(Path(path_save, "graph.npy"), graph)
 
 
@@ -432,7 +432,7 @@ def adding_cluster_to_map(map_cluster, map_patients, map_variants):
 
 # function to write the centroids of each cluster into a file
 def centroids_cluster(dendro, path_save) -> None:
-    with Path(path_save, "Centroidi_Mutazioni.csv").open(
+    with Path(path_save, "mutation_centroids.csv").open(
         "w",
         encoding="utf-8",
     ) as f:
@@ -456,7 +456,7 @@ def centroids_cluster(dendro, path_save) -> None:
 
 # funzione per scrivere il numero di connessioni che ciascuna variante ha nel cluster
 def degree_variant_cluster(map_cluster, graph, path_save) -> None:
-    Path(path_save, "Variants_Degree").mkdir(parents=True, exist_ok=True)
+    Path(path_save, "variants_degree").mkdir(parents=True, exist_ok=True)
     for cluster_index in map_cluster:
         list_vertices_filtered = graph.vs.select(
             lambda x, ci=cluster_index: x["cluster"] == ci,
@@ -465,8 +465,8 @@ def degree_variant_cluster(map_cluster, graph, path_save) -> None:
         degrees = g_cluster.degree()
         with Path(
             path_save,
-            "Variants_Degree",
-            f"variants_degree_cluster{cluster_index}.csv",
+            "variants_degree",
+            f"variants_degree_cluster_{cluster_index}.csv",
         ).open(
             "w",
             encoding="utf-8",
@@ -649,9 +649,9 @@ def count_gene_abs_percent(g, map_cluster, gene_total_count, path_save):
 
 # creazione di un file per ogni cluster, contenente i geni presenti
 def genes_single_cluster(g, map_cluster, path_save) -> None:
-    Path(path_save, "Gene").mkdir(parents=True, exist_ok=True)
+    Path(path_save, "gene_cluster_list").mkdir(parents=True, exist_ok=True)
     for cluster in map_cluster:
-        with Path(path_save, "Gene", f"genes_cluster_{cluster}.csv").open(
+        with Path(path_save, "gene_cluster_list", f"genes_cluster_{cluster}.csv").open(
             "w",
             encoding="utf-8",
         ) as f:
@@ -670,12 +670,12 @@ def genes_count_mutation_single_cluster(
     map_cluster_gene_abs,
     path_save,
 ) -> None:
-    Path(path_save, "Gene_Count").mkdir(parents=True, exist_ok=True)
+    Path(path_save, "count_cluster_list").mkdir(parents=True, exist_ok=True)
     for cluster, infos in map_cluster_gene_abs.items():
         with Path(
             path_save,
-            "Gene_Count",
-            f"genes_cluster_{cluster}.csv",
+            "count_cluster_list",
+            f"count_cluster_{cluster}.csv",
         ).open(
             "w",
             encoding="utf-8",
