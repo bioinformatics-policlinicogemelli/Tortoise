@@ -479,6 +479,9 @@ def select_study(value) -> str:
         ALL_COLUMNS_CLINICAL.remove("cluster")
         BOX_FIG_SELECTED_1 = ALL_COLUMNS_CLINICAL[0]
         BOX_FIG_SELECTED_2 = ALL_COLUMNS_CLINICAL[-1]
+    column_vital_status = CONTEXT_DATA["config"]["clinical_data"]["column_surv_event"]
+    if column_vital_status != "":
+        DF_CLINICAL_DATA[column_vital_status+"_string"] = DF_CLINICAL_DATA[column_vital_status].map({1:"Yes",0:"No"})
     # Reset selection
     CLUSTER_SELECTED = CLUSTERS_INDEX[0]
     CLUSTER_SELECTED_MULTI = ["ALL", CLUSTERS_INDEX[0]]
@@ -2020,18 +2023,17 @@ def dropdpwn_multi_cluster(_):
 )
 def update_overall_survival(cluster):
     global CLUSTER_SELECTED
-    if cluster is None:
-        return no_update, no_update
     CLUSTER_SELECTED = cluster
     col_surv_time = CONTEXT_DATA["config"]["clinical_data"]["column_surv_time"]
     col_surv_event = CONTEXT_DATA["config"]["clinical_data"][
         "column_surv_event"
     ]
+    if cluster is None or col_surv_time == "" or col_surv_event == "":
+        return no_update, no_update
     data = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
     data = data.dropna(subset=[col_surv_time, col_surv_event])
     if len(data) <= 0:
         return no_update, no_update
-    data[col_surv_event] = data[col_surv_event].replace({"Yes": 1, "No": 0})
     kmf = KaplanMeierFitter()
     kmf.fit(
         data[col_surv_time].values,
@@ -2076,11 +2078,11 @@ def update_overall_survival(cluster):
         ),
     )
     # STAT PIE
-    fig_stat = func_single_plot(cluster, col_surv_event)
+    fig_stat = func_single_plot(cluster, col_surv_event+"_string")
     fig_stat.update_layout(
         {
             "title": f"Vital Status Cluster: {cluster}",
-            "legend_title": "Alive",
+            "legend_title": "Deceased",
         },
     )
     return fig, fig_stat
@@ -2094,23 +2096,20 @@ def update_overall_survival(cluster):
 def update_survival_comparison(list_clusters):
     global CLUSTER_SELECTED_MULTI
     min_cluster = 2
-    if len(list_clusters) < min_cluster:
+    col_surv_time = CONTEXT_DATA["config"]["clinical_data"]["column_surv_time"]
+    col_surv_event = CONTEXT_DATA["config"]["clinical_data"][
+        "column_surv_event"
+    ]
+    if len(list_clusters) < min_cluster or col_surv_time == "" or col_surv_event == "":
         return no_update, no_update
     CLUSTER_SELECTED_MULTI = list_clusters
     fig = go.Figure()
     fig_stats = None
     kmf = KaplanMeierFitter()
-    col_surv_time = CONTEXT_DATA["config"]["clinical_data"]["column_surv_time"]
-    col_surv_event = CONTEXT_DATA["config"]["clinical_data"][
-        "column_surv_event"
-    ]
     df_clinical = DF_CLINICAL_DATA[
         DF_CLINICAL_DATA["cluster"].isin(list_clusters)
     ]
     df_clinical = df_clinical.dropna(subset=[col_surv_time, col_surv_event])
-    df_clinical[col_surv_event] = df_clinical[col_surv_event].replace(
-        {"Yes": 1, "No": 0},
-    )
 
     for cluster in list(df_clinical["cluster"].unique()):
         cluster_data = df_clinical[df_clinical["cluster"] == cluster]
