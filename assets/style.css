@@ -1,0 +1,147 @@
+@font-face {
+  font-family: 'Roboto', sans-serif;
+  src: url("/assets/Roboto-Regular.ttf") format('ttf');
+  font-weight: normal;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
+
+:root {
+  --color-1: #ffffff;
+  --color-2: #a5d8fe;
+  --color-3: #073288;
+  --color-4: #000000;
+  --color-5: #e2e2e2;
+}
+
+/* This creates a skinny side bar fixed to the left of the page */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6rem;
+  padding: 1rem 1rem;
+  background-color: var(--color-3);
+  transition: width 0.25s ease-in-out;
+  z-index: 9999;
+  font-family: "Roboto", sans-serif;
+}
+
+/* when the user hovers on the sidebar, expand it */
+.sidebar:hover {
+  width: 18rem;
+}
+
+/* make sure the contents of the navlink don't wrap when navbar collapses */
+.sidebar .nav-link {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* fix the width of the icons */
+.sidebar .nav-link i {
+  width: 3rem;
+}
+
+/* hide the navlink labels by default */
+.sidebar .nav-link span {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
+}
+
+/* when the sidebar is hovered, reveal the labels */
+.sidebar:hover .nav-link span {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* container for the sidebar header. make sure the contents don't wrap when
+ * the sidebar is collapsed.
+ */
+.sidebar-header {
+  display: flex;
+  justify-content: left;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* position the header relative to the logo and hide by default */
+.sidebar-header h2 {
+  opacity: 0;
+  margin-left: 1rem;
+  margin-bottom: 0;
+  transition: opacity 0.25s ease-in-out;
+}
+
+/* reveal the header when the sidebar is toggled */
+.sidebar:hover .sidebar-header h2 {
+  opacity: 1;
+}
+
+/* position the content relative to the collapsed sidebar */
+.content {
+  margin-left: 6rem;
+  margin-right: 0rem;
+  padding: 1rem;
+}
+.navbar_logo {
+  width: 4rem;
+}
+.navbar_title {
+  font-size: 1.5rem;
+  color: var(--color-5);
+}
+.navbar_span {
+  font-size: 1rem;
+}
+.navbar_entity {
+  color: var(--color-1);
+}
+.navbar_entity:hover {
+  color: var(--color-2);
+}
+.nav-pills .nav-link.active {
+  color: var(--color-3);
+  background-color: var(--color-2);
+}
+.info_block {
+  font-size: 1.5rem;
+  text-align: center;
+  background-color: var(--color-2);
+}
+.span_selector {
+  font-size: 1.5rem;
+}
+.markdown {
+  white-space: pre;
+}
+.create_study_log {
+  font-size: 2rem;
+  text-align: center;
+  background-color: var(--color-2);
+}
+.add-border {
+  border-width: "1px";
+  border-style: solid;
+  border-color:  var(--color-5);
+  border-radius: 5px;
+}
+.dd_study_header {
+  font-size: 2rem;
+  text-align: center;
+  color: var(--color-1);
+  background-color: var(--color-3);
+}
+.dd_study_infos {
+  font-size: 2rem;
+}
+.homepage_logo {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 10%;
+}
