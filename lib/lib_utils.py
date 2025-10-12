@@ -72,7 +72,6 @@ import numpy as np
 import pandas as pd
 from rpy2 import robjects
 
-
 def load_df(config):
     """Load dataframes from CSV files based on the provided configuration.
 
@@ -348,32 +347,33 @@ def count_gene(graph):
 
 
 def process_data(args):
-    g = args[0]
+    _graph = args[0]
     _seed = args[1]
+    _resolution = args[2]
     random.seed(_seed)
     np.random.seed(_seed)
-    _dendro_2 = g.community_leiden(objective_function="modularity")
+    _dendro_2 = _graph.community_leiden(objective_function="modularity", resolution_parameter=_resolution)
     return _dendro_2.modularity
 
 
 # SELEZIONE DEL SEED CHE Dà VALORE DI MODULARITà PIù ALTA A SEGUITO DEL LEIDEN ALGORITHM
-def selected_seed(g, seed_trials):
+def selected_seed(graph, seed_trials, resolution):
     mod_results = []
-    data = [(g, s) for s in range(seed_trials)]
+    data = [(graph, s, resolution) for s in range(seed_trials)]
     if sys.platform.startswith("win") or sys.platform.startswith("linux"):
         with Pool() as p:
             mod_results = p.map(process_data, data)
     else:
-        for s in data:
-            mod_results.append(process_data(s))
+        for args in data:
+            mod_results.append(process_data(args))
 
     return mod_results.index(max(mod_results))
 
 
 # SELEZIONE DEL SEED E LANCIO DELL'ALGORITMO DI CLUSTERIZZAZIONE
-def leiden_clustering(graph, best_seed):
-    random.seed(best_seed)
-    return graph.community_leiden(objective_function="modularity")
+def leiden_clustering(graph, seed, resolution):
+    random.seed(seed)
+    return graph.community_leiden(objective_function="modularity", resolution_parameter=resolution)
 
 
 # adding color for cluster (for cytoscape)

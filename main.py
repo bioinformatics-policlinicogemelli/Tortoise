@@ -365,6 +365,25 @@ PAGE_HOME = [
             ),
         ],
     ),
+    # SEED/RESOLUTION
+    dbc.Row(
+        [
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-seed",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-resolution",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+        ],
+    ),
 ]
 
 
@@ -418,6 +437,8 @@ def update_dropdown_liststudy(_):
     Output("dd-study-info-variant", "children"),
     Output("dd-study-info-cluster", "children"),
     Output("dd-study-info-modularity", "children"),
+    Output("dd-study-info-seed", "children"),
+    Output("dd-study-info-resolution", "children"),
     Input("dd-study", "value"),
 )
 def select_study(value) -> str:
@@ -433,16 +454,18 @@ def select_study(value) -> str:
     global BOX_FIG_SELECTED_2
 
     if value is None:
-        return no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     # prevent reload
     if value == CONTEXT_DATA["name_study"]:
         return (
             f"Study {value}",
-            f"Total patient: {CONTEXT_DATA['stats']['num_patient']}",
-            f"Total gene: {CONTEXT_DATA['stats']['num_gene']}",
-            f"Total variant: {CONTEXT_DATA['stats']['num_variant']}",
-            f"Total cluster: {CONTEXT_DATA['stats']['num_cluster']}",
+            f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
+            f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
+            f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
+            f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
             f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
+            f"Seed: {CONTEXT_DATA['stats']['seed']}",
+            f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
         )
 
     # Load config
@@ -502,14 +525,22 @@ def select_study(value) -> str:
         .open("r") as f
     ):
         CONTEXT_DATA["stats"]["modularity"] = f.readline()
-
+    with (
+        CONTEXT_DATA["out_root_path"]
+        .joinpath("seed.info")
+        .open("r") as f
+    ):
+        CONTEXT_DATA["stats"]["seed"] = f.readline()
+      
     return (
         f"Study {value}",
-        f"Total patient: {CONTEXT_DATA['stats']['num_patient']}",
-        f"Total gene: {CONTEXT_DATA['stats']['num_gene']}",
-        f"Total variant: {CONTEXT_DATA['stats']['num_variant']}",
-        f"Total cluster: {CONTEXT_DATA['stats']['num_cluster']}",
-        f"cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
+        f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
+        f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
+        f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
+        f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
+        f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
+        f"Seed: {CONTEXT_DATA['stats']['seed']}",
+        f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
     )
 
 
@@ -539,7 +570,7 @@ PAGE_CREATE_STUDY = [
             ),
         ],
     ),
-    # NAME STUDY
+    # SEED TRIALS
     dbc.Row(
         [
             dbc.Col(
@@ -554,6 +585,31 @@ PAGE_CREATE_STUDY = [
                         [5_000, 10_000, 25_000, 50_000, 100_000, 500_000],
                         placeholder=10_000,
                         id="seed-trials",
+                        style={"width": "100%"},
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
+    # CLUSTERING RESOLUTION
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("Clustering resolution:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Input(
+                        id="clustering-resolution",
+                        type="number",
+                        placeholder="1.0",
+                        min=0.01,
+                        max=2.0,
+                        step=0.01,
                         style={"width": "100%"},
                     ),
                 ],
@@ -996,6 +1052,7 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     State("dd-vaf", "value"),
     State("input-vaf-score", "value"),
     State("seed-trials", "value"),
+    State("clustering-resolution", "value"),
     prevent_initial_call=True,
 )
 def create_study(
@@ -1019,7 +1076,8 @@ def create_study(
     c_identifier,
     c_vaf,
     vaf_score,
-    seed_trials
+    seed_trials,
+    clustering_resolution,
 ):
     global CONTEXT_DATA
     global PATH_CONFIG
@@ -1073,6 +1131,8 @@ def create_study(
             )
     if seed_trials is None:
         seed_trials = 10_000
+    if clustering_resolution is None:
+        clustering_resolution = 1.0
     # CREATE STUDY FOLDER
     Path("study", input_namestudy, "input").mkdir(parents=True, exist_ok=True)
     # MUTATIONAL DATA
@@ -1115,6 +1175,7 @@ def create_study(
     config_dict["mutation"]["column_gene"] = c_gene
     config_dict["mutation"]["column_sample_name"] = c_sample_mutation
     config_dict["seed_trials"] = seed_trials
+    config_dict["clustering_resolution"] = clustering_resolution
     # REMOVE EXTRA SEPARATOR BEFOR JOIN
     c_identifier_clean = [col.replace(";", "") for col in c_identifier]
     config_dict["mutation"]["identifier_columns"] = ";".join(
@@ -1585,7 +1646,7 @@ PAGE_PATHWAY_ANALYSIS = [
                     dcc.RadioItems(
                         options=[
                             {
-                                "label": "Biological Function",
+                                "label": "Biological Process",
                                 "value": "biological",
                             },
                             {

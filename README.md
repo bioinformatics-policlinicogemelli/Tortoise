@@ -94,6 +94,8 @@ There are **2 principal sections**:
 
    * through the **Seed trials** field you can select the random search iterations performed to find the best modularity result.
 
+   * the **Clustering resolution** field allows you to set the clustering resolution between 0.01 and 2, with a default value of 1.
+
    * to identify mutations, you can select one or more columns in the **Identifier Columns** field, which will be used as the unique identifier of the mutation.
    
    * for the **VAF**, if you want to make a filter it's possibile to specify a threshold value into **VAF Score** and the name of the column for the VAF into **Column VAF**. In the event that such a threshold is chosen but vaf column isn't present in the dataset, it will be calculated according to the formula: **t_alt_count / t_alt_count + t_ref_count** and save into the column named "t_AF". 
