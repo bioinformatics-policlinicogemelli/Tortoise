@@ -210,7 +210,7 @@ SIDEBAR = html.Div(
                     active="exact",
                     className="navbar_entity",
                 ),
-                # PATWAY
+                # PATHWAY
                 dbc.NavLink(
                     [
                         html.I(className="fas fa-diagram-project"),
@@ -1384,19 +1384,19 @@ PAGE_STUDY_DESCRIPTION = [
                     # LAYOUT SELECTOR
                     dcc.RadioItems(
                         options=[
-                            "cose",
-                            "concentric",
-                            "grid",
-                            "circle",
-                            "breadthfirst",
-                            "klay",
+                            {"label": "cose", "value": "cose"},
+                            {"label": "concentric", "value": "concentric"},
+                            {"label": "grid", "value": "grid"},
+                            {"label": "circle", "value": "circle"},
+                            {"label": "breadthfirst", "value": "breadthfirst"},
+                            {"label": "klay", "value": "klay"},
                         ],
                         value="cose",
                         inline=True,
                         id="radio-layouts",
                         persistence=True,
                         persistence_type="memory",
-                        style={"width": "100%", "height": "2vh"},
+                        labelStyle={"marginRight": "15px"},
                     ),
                 ],
                 lg=6,
@@ -1893,7 +1893,18 @@ PAGE_CLINICAL_DATA = [
             ),
         ],
     ),
-    dbc.Row([dash_table.DataTable(id="table_clinical_data")]),
+    dbc.Row([
+        dash_table.DataTable(
+            id="table_clinical_data",
+            columns=[], # to be set in the callback
+            data=[],    # to be set in the callback
+            filter_action="native",
+            filter_options={"case": "insensitive", "placeholder_text": "Filter..."},
+            sort_action="native",
+            page_size=10,
+            ),
+        html.Div(id="patient_summary"),
+        ]),
 ]
 
 
@@ -1962,15 +1973,50 @@ def update_box_2(cluster, col_name):
 
 
 # TABLE CLINICAL_DATA:
-@callback(Output("table_clinical_data", "data"), Input("dd-cluster", "value"))
+@callback(
+        Output("table_clinical_data", "data"),
+        Output("table_clinical_data", "columns"),
+        Input("dd-cluster", "value")
+    )
 def update_table_clinical_data(cluster):
     if cluster is None:
-        return no_update
+        return [], []
+
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
-    cluster_values = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
-    return cluster_values.to_dict("records")
 
+    cluster_values = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
+
+    data = cluster_values.to_dict("records")
+    columns = [{"name": c, "id": c} for c in cluster_values.columns]
+
+    return data, columns
+
+# INFO PATIENTS SUMMARY
+@callback(
+    Output("patient_summary", "children"),
+    Input("table_clinical_data", "derived_virtual_data")
+)
+def count_unique_patients(rows):
+    # Check data presence
+    if rows is None or len(rows) == 0:
+        return "No data present in the filtered table."
+
+    # Data arrives as a list of dicts from the front-end
+    df = pd.DataFrame(rows)
+
+    # Check if PATIENT_ID exists
+    if "PATIENT_ID" not in df.columns:
+        return "Column 'PATIENT_ID' not found in the table."
+
+    # Calculate unique values
+    unique_ids = df["PATIENT_ID"].unique()
+    count_unique = len(unique_ids)
+
+    return [
+        html.Div(f"Unique patients for cluster {CLUSTER_SELECTED}: {count_unique}"),
+        html.Div("Patients list: " + ", ".join(map(str, unique_ids)))
+    ]
 
 # SURVIVAL ANALYSIS
 PAGE_SURVIVAL_ANALYSIS = [
