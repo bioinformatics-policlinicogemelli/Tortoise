@@ -1,7 +1,7 @@
 # 🧬 **TORTOISE** - ne<span style="color:lightgreen"><b>T</b></span>w<span style="color:lightgreen"><b>OR</b></span>k <span style="color:lightgreen"><b>T</b></span>ool f<span style="color:lightgreen"><b>O</b></span>r mutat<span style="color:lightgreen"><b>I</b></span>onal clu<span style="color:lightgreen"><b>S</b></span>t<span style="color:lightgreen"><b>E</b></span>ring
 <p align="center"><img src="assets/tortoise.png" height=170></p>
 
-TORTOISE rapresents a bioinformatics tool that enables the construction of a bipartite graph from mutational data and the subsequent clustering of the constructed network. 
+TORTOISE represents a bioinformatics tool that enables the construction of a bipartite graph from mutational data and the subsequent clustering of the constructed network. 
 The tool allows for the analysis of the identified clusters and their visualization through a dedicated dashboard.
 
 ## Main Features ✨
@@ -51,7 +51,7 @@ docker run -p 8593:8593 --name tortoise tortoise
 ```
 
 
-If you want to mount external study folder run
+If you want to mount an external study folder run
 
 ```bash
 docker run -p 8593:8593 -v absolute_path_local_folder:/tortoise/study --name tortoise tortoise
@@ -74,23 +74,23 @@ docker restart tortoise
 ---
 
 ### **Home**
-In this page it's possibile to select a study, that has already been previously analysed through the tool, and is present into **study** folder
+On the home page, it is possible to select a study that has already been analysed with the tool and is stored in the **study** folder
 
 <img src="./images/home.png" alt = "Pages Dashboard">
 
 ---
 
 ### **Create study**
-In this page it's possibile to create a study, selecting the input files.
+On this page it's possibile to create a study, selecting the input files.
 
 <img src="./images/create_study.png" alt = "Pages Dashboard">
 
 There are **2 principal sections**:
 
-1. **Mutation Section** (**Obbligatory**): it's possibile to **upload** the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped before header. 
+1. **Mutation Section** (**Required**): the tools allows the **upload** of the file containing the mutations (maf, csv or txt extension), specifying the separator and the rows to be skipped before the header. 
    > ℹ️ **To create a maf file, starting from VCF, you can use [Varan](https://github.com/bioinformatics-policlinicogemelli/Varan) tool**
 
-   In the second part it's possibile specify the setting for mutational analysis.
+   In the second part the user can specify the setting for mutational analysis.
 
    * through the **Seed trials** field you can select the random search iterations performed to find the best modularity result.
 
@@ -98,46 +98,46 @@ There are **2 principal sections**:
 
    * to identify mutations, you can select one or more columns in the **Identifier Columns** field, which will be used as the unique identifier of the mutation.
    
-   * for the **VAF**, if you want to make a filter it's possibile to specify a threshold value into **VAF Score** and the name of the column for the VAF into **Column VAF**. In the event that such a threshold is chosen but vaf column isn't present in the dataset, it will be calculated according to the formula: **t_alt_count / t_alt_count + t_ref_count** and save into the column named "t_AF". 
+   * for the **VAF**, if you want to apply a filter, you can specify a threshold value in **VAF Score** and the name of the VAF column in **Column VAF**. If a threshold is set but the VAF column is not present in the dataset, it will be calculated using the formula: **t_alt_count / t_alt_count + t_ref_count** and saved into a column named "t_AF". 
       >⚠️ Only values greater than or equal to the threshold will be considered.
 
-2. **Clinical Section** (**Faculty**): it's possibile to upload the files containing clinical info. Two types of files containing the clinical data can be inserted: the **data clinical patient** and the **data clinical sample**, again specifying the separator, the rows to be skipped before the header and the identifier for the **patient** (data clinical  patient) and for the **sample** (data clinical sample)
-   >⚠️ At the moment, it's necessary that the **Column Survival Event** contains only `1` for death and `0` for alive patients
+2. **Clinical Section** (**Optional**): it is possible to upload the files containing the clinical information. Two types of files can be provided: **clinical data patient** and **clinical data sample**, specifying the separator, the number of rows to skip before the header, and the identifier for the **patient** (clinical data patient) or for the **sample** (clinical data sample).
+   >⚠️ At the moment, the **Column Survival Event** must contain only `1` for deceased patients `0` for living patients.
 
 **Once the [study](#study-structure) has been created, it can be selected on the homepage.**
 
 ---
 
 ### **Study description**
-In this page it's possibile to visualize a summary for every cluster: number of patients, number of mutations and mutation centroid. It's also possibile visualize the plot of cluster graph, the number of mutation for each gene and the degree of mutation into the cluster.
+On this page, it is possible to view a summary for each cluster: the number of patients, the number of mutations, and the mutation centroid. You can also view the cluster graph, the number of mutations for each gene, and the mutation degree within the cluster.
 
 <img src="./images/study_description.png">
 
 ---
 
 ### **Pathways analysis**
-In this page it's possibile to visualize the enrichment analysis for every cluster. The database analyzed are: **GO**, **KEGG**, **REACTOME** and **Wikipathway**. it's also possibile to select the threshold for the p-value and if visualize the pathway that are significant for the adjusted p-value.
+On this page, you can view the enrichment analysis for each cluster. The databases used are **GO**, **KEGG**, **REACTOME** and **Wikipathway**. You can also set the p-value threshold and choose whether to display only the pathways that are significant after adjusted p-value correction.
 
 <img src="./images/pathways_analysis.png"> 
 
 ---
 
 ### **Clinical data**
-In this page it's possibile to visualize the clinical parameters for every cluster.
+Here, it's possibile to visualize the clinical parameters for every cluster.
 
 <img src="./images/clinical_data.png">
 
 ---
 
 ### **Survival analysis**
-If there are info about the vital status and OS months, in this page it's possibile to visualize the Kaplan-Meier curve for the cluster selected, a pie chart with the distribution for alive or death patient and a statistical comparison of survival between cluster.
+If information about vital status and OS months is available, this page shows the Kaplan–Meier curve for the selected cluster, a pie chart displaying the distribution of alive and deceased patients, and a statistical comparison of survival between clusters.
 
 <img src="./images/survival.png">
 
 ---
 
 ### **Cluster comparison**
-In this page it's possibile to make a comparison between cluster. For numerical parameter, a statistical test is performed to view if there are significant statistical difference.
+Here, you can compare the clusters. For numerical parameters, a statistical test is performed to assess whether there are significant differences.
 
 <img src="./images/cluster_comparison.png">
 
