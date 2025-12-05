@@ -929,6 +929,68 @@ PAGE_CREATE_STUDY = [
             ),
         ],
     ),
+    # COPY NUMBER VARIATION(CNV) FILE
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("File CNV:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    du.Upload(
+                        id="cnv-file",
+                        text="Upload CNV File",
+                        chunk_size=100,
+                    ),
+                ],
+                width=3,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        ["\\t", ",", ";"],
+                        placeholder="Select separator",
+                        id="cnv-separator",
+                    ),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Input(
+                        id="cnv-skiprow",
+                        type="number",
+                        placeholder="Skiprows",
+                        min=0,
+                    ),
+                ],
+                width=2,
+            ),
+        ],
+    ),
+    # COLUMN CNV IDENTIFIER
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("Column CNV Identifier:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        options=[],
+                        id="column-cnv-identifier",
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
     # CREATE STUDY BUTTON
     dbc.Row(
         [
@@ -1027,6 +1089,28 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     )
     return df_mut.columns, df_mut.columns, df_mut.columns, df_mut.columns
 
+# dropdown cnv identifier
+@callback(
+    Output("column-cnv-identifier", "options"),
+    [
+        Input("cnv-file", "isCompleted"),
+        State("cnv-file", "fileNames"),
+        Input("cnv-separator", "value"),
+        Input("cnv-skiprow", "value"),
+    ],
+    prevent_initial_call=True,
+)
+def update_list_columns_cnv_identifier(loaded, filename, sep, skip):
+    if not loaded or sep is None or skip is None:
+        return []
+    df_cnv = pd.read_csv(
+        Path("temp", filename[0]),
+        sep=sep,
+        skiprows=skip,
+        engine="python",
+        nrows=0,
+    )
+    return list(df_cnv.columns)
 
 @callback(
     Output("confirm-study", "displayed"),
@@ -1042,6 +1126,10 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     State("clinical-sample-file", "fileNames"),
     State("clinical-sample-separator", "value"),
     State("clinical-sample-skiprow", "value"),
+    State("cnv-file", "fileNames"),
+    State("cnv-separator", "value"),
+    State("cnv-skiprow", "value"),
+    State("column-cnv-identifier", "value"),
     State("dd-column-patient-name", "value"),
     State("dd-column-survival-event", "value"),
     State("dd-column-survival-time", "value"),
@@ -1067,6 +1155,10 @@ def create_study(
     clinical_sample_filename,
     clinical_sample_separator,
     clinical_sample_skiprow,
+    cnv_filename,
+    cnv_separator,
+    cnv_skiprow,
+    cnv_identifier,
     c_patient_name,
     c_surv_event,
     c_surv_time,
