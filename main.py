@@ -1221,6 +1221,16 @@ def create_study(
                 True,
                 "Please select column for sample name on clinical sample file",
             )
+    if cnv_filename is not None:
+        if cnv_separator is None:
+            return True, "Please select separator for CNV data"
+        if cnv_skiprow is None:
+            return True, "Please select skiprow for CNV data"
+        if cnv_identifier is None:
+            return (
+                True,
+                "Please select column for CNV identifier",
+            )
     if seed_trials is None:
         seed_trials = 10_000
     if clustering_resolution is None:
@@ -1242,11 +1252,17 @@ def create_study(
         Path("temp", clinical_sample_filename[0]).rename(
             Path("study", input_namestudy, "input", "clinical_sample.txt"),
         )
+    # CNV FILE
+    if cnv_filename is not None:
+        Path("temp", cnv_filename[0]).rename(
+            Path("study", input_namestudy, "input", "cnv_data.txt"),
+        )
     # GENERATE JSON CONFIG
     config_dict = {}
     config_dict["paths"] = {}
     config_dict["clinical_data"] = {}
     config_dict["mutation"] = {}
+    config_dict["cnv"] = {}
     config_dict["name"] = input_namestudy
     config_dict["paths"]["data_mutational"] = str(
         Path(
@@ -1308,6 +1324,18 @@ def create_study(
             clinical_sample_skiprow
         )
         config_dict["clinical_data"]["column_sample_name"] = c_sample_name
+    if cnv_filename is not None:
+        config_dict["paths"]["data_cnv"] = str(
+            Path(
+                "study",
+                input_namestudy,
+                "input",
+                "cnv_data.txt",
+            ),
+        )
+        config_dict["paths"]["data_cnv_sep"] = "\t"
+        config_dict["paths"]["data_cnv_skip"] = cnv_skiprow
+        config_dict["cnv"]["column_identifier"] = cnv_identifier
     PATH_CONFIG = Path("study", input_namestudy, "config.json")
     with PATH_CONFIG.open("w", encoding="utf-8") as f:
         json.dump(config_dict, f, indent=4)

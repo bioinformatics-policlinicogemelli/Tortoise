@@ -110,12 +110,14 @@ def load_df(config):
             or None if not provided.
 
     """
+    # MUTATIONAL DATA
     df_mut = pd.read_csv(
         config["paths"]["data_mutational"],
         sep=config["paths"]["data_mutational_sep"],
         skiprows=config["paths"]["data_mutational_skip"],
         low_memory=False,
     )
+    # CLINICAL DATA
     data_clinical_sample = None
     if config["paths"]["data_clinical_sample"] != "":
         data_clinical_sample = pd.read_csv(
@@ -124,6 +126,7 @@ def load_df(config):
             skiprows=config["paths"]["data_clinical_sample_skip"],
             low_memory=False,
         )
+    # CLINICAL PATIENT DATA
     data_clinical_patient = None
     if config["paths"]["data_clinical_patient"] != "":
         data_clinical_patient = pd.read_csv(
@@ -132,7 +135,18 @@ def load_df(config):
             skiprows=config["paths"]["data_clinical_patient_skip"],
             low_memory=False,
         )
-    return df_mut, data_clinical_sample, data_clinical_patient
+    # CNV DATA
+    data_cnv = None
+    data_cnv_path = config["paths"].get("data_cnv", "")
+    if data_cnv_path != "":
+        data_cnv = pd.read_csv(
+            data_cnv_path,
+            sep=config["paths"].get("data_cnv_sep"),
+            skiprows=config["paths"].get("data_cnv_skip"),
+            low_memory=False,
+        )
+
+    return df_mut, data_clinical_sample, data_clinical_patient, data_cnv
 
 
 def filter_vaf(config, df_mut):

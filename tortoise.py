@@ -55,7 +55,7 @@ def main(path_config: Path) -> None:
     Path(path_save).mkdir(parents=True, exist_ok=True)
     # load df
     logger.info(" 10% -- Load files")
-    df_mut, data_clinical_sample, data_clinical_patient = libu.load_df(config)
+    df_mut, data_clinical_sample, data_clinical_patient, data_cnv = libu.load_df(config)
     # create maps and graph
     logger.info(" 20% -- Add category mutations")
     if len(identifier_columns) > 1:
