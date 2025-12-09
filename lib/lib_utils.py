@@ -262,7 +262,7 @@ def adding_category_mutation(data_mutational, list_columns):
     return data_mutational
 
 
-# funzione per cacolare, se assente, la colonna della VAF
+# funzione per calcolare, se assente, la colonna della VAF
 def calculated_vaf(riga):
     if riga["t_alt_count"] is np.nan or riga["t_ref_count"] is np.nan:
         return np.nan
@@ -270,7 +270,53 @@ def calculated_vaf(riga):
         return 0
     return riga["t_alt_count"] / (riga["t_alt_count"] + riga["t_ref_count"])
 
+# Preprocessing CNV data
+def preprocess_cnv(data_cnv, column_cnv_gene=None):
+    """
+    Preprocessing CNV data:
+      - Identify gene column
+      - Set gene index
+      - Keep patient columns
+      - Convert CNV numeric values into Gain/Loss categories:
+            -2, -1 → "Loss"
+             1,  2 → "Gain"
+             0, NaN → removed (kept as NaN)
+      - Returns categorical CNV dataframe ready for mapping
+    """
 
+    d_cnv = data_cnv.copy()
+
+    # 1. Gene column
+    if column_cnv_gene is not None:
+        gene_col = column_cnv_gene
+    elif "Hugo_Symbol" in d_cnv.columns:
+        gene_col = "Hugo_Symbol"
+    else:
+        gene_col = d_cnv.columns[0]
+
+    # 2. Set index on gene
+    d_cnv = d_cnv.set_index(gene_col)
+
+    # 3. Patient columns (all except gene column)
+    patient_cols = [col for col in d_cnv.columns if col != gene_col]
+    d_cnv = d_cnv[patient_cols]
+
+    # 4. Convert to numeric safely
+    d_cnv = d_cnv.apply(pd.to_numeric, errors="coerce")
+
+    # 5. Convert CNV values → categories
+    d_cnv = d_cnv.replace({
+        -2: "Loss",
+        -1: "Loss",
+         1: "Gain",
+         2: "Gain",
+         0: np.nan   # 0 does not interest us
+    })
+
+    return d_cnv
+
+
+# Create maps for data mutational
 def create_maps(
     data_mutational,
     column_mutation,
@@ -312,8 +358,27 @@ def create_maps(
 
     return map_patients, map_variants
 
+# Create maps for CNV
+def create_cnv_map(d_cnv):
+    map_cnv = {}
+    map_pat = {}
 
-# Creazione del Grafo
+    for gene, row in d_cnv.iterrows():
+        for paz, cnv_event in row.items():
+
+            if pd.isna(cnv_event):
+                continue  # ignore 0 or missing
+
+            # CNV map
+            map_cnv.setdefault(gene, {})[paz] = cnv_event
+
+            # Patient map
+            map_pat.setdefault(paz, {"cnv": {}})
+            map_pat[paz]["cnv"][gene] = cnv_event
+
+    return map_pat, map_cnv
+
+# Creazione del Grafo dei pazienti e delle varianti
 def graph_creation(map_patients, map_variants):
     edges = [
         (_k_variant, _k_patient)
@@ -346,6 +411,42 @@ def graph_creation(map_patients, map_variants):
     graph.add_edges(edges)
     return graph
 
+# Creazione del grafo dei pazienti e dei CNV
+def graph_cnv(map_pat, map_cnv):
+    # CNV gene → Patient edges list
+    edges = [
+        (gene, paz)
+        for gene, paz_dict in map_cnv.items()
+        for paz in paz_dict.keys()
+    ]
+
+    g_cnv = ig.Graph()
+
+    # Add CNV nodes (CNV genes)
+    g_cnv.add_vertices(
+        list(map_cnv.keys()),
+        attributes={
+            "vertex_type": ["CNV"] * len(map_cnv),
+            "color_vertex": ["blue"] * len(map_cnv),
+            "shape_vertex": ["circle"] * len(map_cnv),
+            "gene": list(map_cnv.keys()),  # The gene name is the node name
+        },
+    )
+
+    # Add patients nodes
+    g_cnv.add_vertices(
+        list(map_pat.keys()),
+        attributes={
+            "vertex_type": ["PATIENT"] * len(map_pat),
+            "color_vertex": ["red"] * len(map_pat),
+            "shape_vertex": ["triangle-up"] * len(map_pat),
+        },
+    )
+
+    # Add edges
+    g_cnv.add_edges(edges)
+
+    return g_cnv
 
 # count dei geni presenti in relazione alle singole mutazioni
 def count_gene(graph):
@@ -413,11 +514,18 @@ def adding_graph_color(graph, dendro):
     return graph
 
 
-# function to save graph as graphml file for cytoscape
-def save_graph_to_file(graph, path_save) -> None:
-    graph.write_graphml(f"{path_save}/graph_cytoscape.graphml")
-    np.save(Path(path_save, "graph.npy"), graph)
+# # function to save graph as graphml file for cytoscape
+# def save_graph_to_file(graph, path_save) -> None:
+#     graph.write_graphml(f"{path_save}/graph_cytoscape.graphml")
+#     np.save(Path(path_save, "graph.npy"), graph)
 
+# function to save graph as graphml file for cytoscape
+def save_graph_to_file(graph, path_save, name="graph"):
+    path_save = Path(path_save)
+    path_save.mkdir(parents=True, exist_ok=True)
+
+    graph.write_graphml(path_save / f"{name}.graphml")
+    np.save(path_save / f"{name}.npy", graph)
 
 # function to create a map for cluster
 def map_cluster_creation(graph, dendro):
@@ -443,6 +551,31 @@ def adding_cluster_to_map(map_cluster, map_patients, map_variants):
 
     return map_patients, map_variants
 
+# Function to add clusters to CNV map
+def adding_cluster_to_map_cnv(map_cluster, map_pat, map_cnv):
+    """
+    Assign clusters to patients and CNV genes based on community detection results.
+    
+    map_cluster: {cluster_id: [(node_name, node_type), ...]}
+    map_patients: {patient_id: {...}}
+    map_cnv: {gene: {...}}  # CNV map (genes)
+    """
+
+    for cluster, infos in map_cluster.items():
+        for node_name, node_type in infos:
+
+            # Patients
+            if node_type == "PATIENT":
+                map_pat[node_name]["cluster"] = cluster
+
+            # CNV
+            elif node_type == "CNV":
+                if "cluster" not in map_cnv[node_name]:
+                    map_cnv[node_name]["cluster"] = cluster
+                else:
+                    map_cnv[node_name]["cluster"] = cluster
+
+    return map_pat, map_cnv
 
 # function to write the centroids of each cluster into a file
 def centroids_cluster(dendro, path_save) -> None:
@@ -467,6 +600,27 @@ def centroids_cluster(dendro, path_save) -> None:
                 f"Cluster {_i} centroids found {len(cen_list)}: {cen_list}\n",
             )
 
+# cnv cluster centroid
+def centroids_cluster_cnv(dendro, path_save) -> None:
+    out_file = Path(path_save, "cnv_centroids.csv")
+    with out_file.open("w", encoding="utf-8") as f:
+        for i, _ in enumerate(dendro):
+            sub_graph = dendro.subgraph(i)
+            max_value = 0
+            cen_list = []
+            for v in sub_graph.vs():
+                if v["vertex_type"] != "CNV": # only CNV gene nodes
+                    continue
+                # Neighborhood size = degree + 1 (igraph counts itself)
+                temp_val = sub_graph.neighborhood_size(v)
+                if temp_val > max_value:
+                    max_value = temp_val
+                    cen_list = [(v["name"], max_value - 1)]  # remove self-loop count
+                elif temp_val == max_value:
+                    cen_list.append((v["name"], max_value - 1))
+            f.write(
+                f"Cluster {i} centroids found {len(cen_list)}: {cen_list}\n"
+                )
 
 # funzione per scrivere il numero di connessioni che ciascuna variante ha nel cluster
 def degree_variant_cluster(map_cluster, graph, path_save) -> None:
@@ -490,6 +644,24 @@ def degree_variant_cluster(map_cluster, graph, path_save) -> None:
                 if g_cluster.vs[i]["vertex_type"] != "PATIENT":
                     f.write(f"{g_cluster.vs[i]['name']}\t{degree}\n")
 
+# number of connection fo each cluster
+def degree_cnv_cluster(map_cluster, graph, path_save) -> None:
+    Path(path_save, "cnv_degree").mkdir(parents=True, exist_ok=True)
+    for cluster_index in map_cluster:
+        # Select vertices belonging to this cluster
+        list_vertices_filtered = graph.vs.select(
+            lambda v, ci=cluster_index: v["cluster"] == ci
+        )
+        # Induced subgraph (cluster-specific)
+        g_cluster = graph.induced_subgraph(list_vertices_filtered)
+        degrees = g_cluster.degree()
+        out_path = Path(path_save, "cnv_degree", f"cnv_degree_cluster_{cluster_index}.csv")
+        with out_path.open("w", encoding="utf-8") as f:
+            f.write("CNV\tDegree\n")
+            for i, degree in enumerate(degrees):
+                # Only CNV-type nodes
+                if g_cluster.vs[i]["vertex_type"] == "CNV":
+                    f.write(f"{g_cluster.vs[i]['name']}\t{degree}\n")
 
 # AGGIUNTA DELLE INFORMAZIONI CLINICHE DI INTERESSE ALLA MAPPA DEI PAZIENTI
 # + AGGIUNTA DEL CLUSTER DI APPARTENENZA ALLA MAPPA DEI PAZIENTI E DELLE MITAZIONI
@@ -528,7 +700,7 @@ def adding_clinical_info_graph(graph, map_patients):
 
 
 # CREAZIONE DEL FILE "CLUSTER_CLINICAL_DATA" IN CUI INSERIAMO
-# IL CLUSTER DI APPARTENENZA DI OGI SAMPLES + INFORMAZIONI CLINICHE
+# IL CLUSTER DI APPARTENENZA DI OGNI SAMPLES + INFORMAZIONI CLINICHE
 def creation_cluster_clinical_data(map_patient, path_saved) -> None:
     header_clinical_data = sorted(
         {k2 for v in map_patient.values() for k2 in v if k2 != "variants"},
@@ -589,7 +761,7 @@ def numerosity_info(g, map_cluster, path_save) -> None:
 
 # riassunto delle informazioni (mutazioni e pazienti per ciascun cluster)
 def summary_info(g, map_cluster, patient_column, path_save) -> None:
-    with Path(path_save, "summury_file.csv").open("w", encoding="utf-8") as f:
+    with Path(path_save, "summary_file.csv").open("w", encoding="utf-8") as f:
         f.write("Cluster\tNode_Name\tType\tGene\tPatient_id\n")
         for cluster in map_cluster:
             for v in [v for v in g.vs if v["cluster"] == cluster]:
@@ -660,6 +832,60 @@ def count_gene_abs_percent(g, map_cluster, gene_total_count, path_save):
 
     return map_cluster_gene, map_cluster_percent
 
+# conta dei cnv per cluster + percentuale
+# distizione tra Gain e Loss
+def count_gene_abs_percent_cnv(g, map_cluster, gene_total_count_gl, path_save):
+    """
+    Count absolute and percent presence of CNV events (Gain/Loss)
+    per gene in each cluster.
+
+    gene_total_count_gl must contain:
+        { (gene, event): total occurrences }
+    """
+
+    map_cluster_gene = {}
+
+    for cluster in map_cluster:
+        map_cluster_gene[cluster] = {}
+
+        # extract CNV nodes within the cluster
+        cnv_nodes = [
+            v for v in g.vs
+            if v["cluster"] == cluster and v["vertex_type"] == "CNV"
+        ]
+
+        # tuple list (cnv gene, event)
+        gene_event_list = [(v["name"], v["event"]) for v in cnv_nodes]
+
+        # absolute count within the cluster
+        for gene_event in set(gene_event_list):
+            count = gene_event_list.count(gene_event)
+            map_cluster_gene[cluster][gene_event] = count
+
+    # percentage
+    map_cluster_percent = {}
+
+    for cluster, gene_events in map_cluster_gene.items():
+        map_cluster_percent[cluster] = {}
+
+        for (gene, event), count_abs in gene_events.items():
+            total = gene_total_count_gl[(gene, event)]
+            percentage = (count_abs * 100) / total
+            map_cluster_percent[cluster][(gene, event)] = percentage
+
+    map_cluster_percent = {
+        cl: dict(sorted(vals.items(), key=lambda x: x[1], reverse=True))
+        for cl, vals in map_cluster_percent.items()
+    }
+    out_file = Path(path_save, "distribution_cnv_gainloss_cluster.csv")
+
+    with out_file.open("w", encoding="utf-8") as f:
+        f.write("Cluster\tCNV gene\tEvent\tPercentage\n")
+        for cluster, ge_dict in map_cluster_percent.items():
+            for (gene, event), perc in ge_dict.items():
+                f.write(f"{cluster}\t{gene}\t{event}\t{perc}\n")
+
+    return map_cluster_gene, map_cluster_percent
 
 # creazione di un file per ogni cluster, contenente i geni presenti
 def genes_single_cluster(g, map_cluster, path_save) -> None:
@@ -676,6 +902,21 @@ def genes_single_cluster(g, map_cluster, path_save) -> None:
             }
             for genes in set_gene:
                 f.write(genes + "\n")
+
+# creazione di un file per ogni cluster, contenente i geni CNV presenti
+def genes_single_cluster_cnv(g, map_cluster, path_save) -> None:
+    Path(path_save, "cnv_cluster_list").mkdir(parents=True, exist_ok=True)
+    for cluster in map_cluster:
+        out_path = Path(path_save, "cnv_cluster_list", f"cnv_cluster_{cluster}.csv")
+        with out_path.open("w", encoding="utf-8") as f:
+            set_gene = {
+                v["name"]                   # nome del nodo = gene
+                for v in g.vs
+                if v["cluster"] == cluster
+                and v["vertex_type"] == "CNV"
+            }
+            for gene in sorted(set_gene):
+                f.write(gene + "\n")
 
 
 # creazione di un file che per ogni cluster,
@@ -698,6 +939,25 @@ def genes_count_mutation_single_cluster(
             for k, v in infos.items():
                 f.write(f"{k}\t{v}\n")
 
+# creazione di un file che per ogni cluster,
+# tiene il conto del numero di CNV presenti
+def genes_count_cnv_single_cluster(
+    map_cluster_cnv_abs,
+    path_save,
+) -> None:
+    Path(path_save, "count_cnv_cluster_list").mkdir(parents=True, exist_ok=True)
+    for cluster, infos in map_cluster_cnv_abs.items():
+        with Path(
+            path_save,
+            "count_cnv_cluster_list",
+            f"count_cnv_cluster_{cluster}.csv",
+        ).open(
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write("CNV GENE\tCOUNT\n")
+            for k, v in infos.items():
+                f.write(f"{k}\t{v}\n")
 
 # AGGIUNTA DELL'ATTRIBUTO CLUSTER AI NODI DEL GRAFO
 def cluster_noded_attributes(g, map_patient, map_variant):
@@ -706,4 +966,13 @@ def cluster_noded_attributes(g, map_patient, map_variant):
             v["cluster"] = map_patient[v["name"]]["cluster"]
         else:
             v["cluster"] = map_variant[v["name"]]["cluster"]
+    return g
+
+# AGGIUNTA DELL'ATTRIBUTO CLUSTER AI NODI DEL GRAFO
+def cluster_cnv_noded_attributes(g, map_pat, map_cnv):
+    for v in g.vs():
+        if v["vertex_type"] == "PATIENT":
+            v["cluster"] = map_pat[v["name"]]["cluster"]
+        else:
+            v["cluster"] = map_cnv[v["name"]]["cluster"]
     return g

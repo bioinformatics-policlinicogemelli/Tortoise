@@ -1335,7 +1335,7 @@ def create_study(
         )
         config_dict["paths"]["data_cnv_sep"] = "\t"
         config_dict["paths"]["data_cnv_skip"] = cnv_skiprow
-        config_dict["cnv"]["column_identifier"] = cnv_identifier
+        config_dict["cnv"]["column_cnv_identifier"] = cnv_identifier
     PATH_CONFIG = Path("study", input_namestudy, "config.json")
     with PATH_CONFIG.open("w", encoding="utf-8") as f:
         json.dump(config_dict, f, indent=4)
