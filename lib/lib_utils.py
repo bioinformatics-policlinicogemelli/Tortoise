@@ -422,14 +422,21 @@ def graph_cnv(map_pat, map_cnv):
 
     g_cnv = ig.Graph()
 
+    # Extract event for each gene (first event from the first patient)
+    cnv_genes = list(map_cnv.keys())
+    cnv_events = [
+        next(iter(map_cnv[gene].values())) for gene in cnv_genes
+    ]
+
     # Add CNV nodes (CNV genes)
     g_cnv.add_vertices(
-        list(map_cnv.keys()),
+        cnv_genes,
         attributes={
             "vertex_type": ["CNV"] * len(map_cnv),
             "color_vertex": ["blue"] * len(map_cnv),
             "shape_vertex": ["circle"] * len(map_cnv),
-            "gene": list(map_cnv.keys()),  # The gene name is the node name
+            "gene": cnv_genes,  # The gene name is the node name
+            "event": cnv_events,  # The CNV event (e.g., "gain", "loss")
         },
     )
 
@@ -460,6 +467,18 @@ def count_gene(graph):
         sorted(gene_total_count.items(), key=lambda kv: kv[1], reverse=True),
     )
 
+def count_gene_cnv(graph):
+    """Count genes by their event type (Gain, Loss, etc.)"""
+    gene_event_count = {}
+    for vertex in graph.vs:
+        if vertex["vertex_type"] == "CNV":
+            gene = vertex["gene"]
+            event = vertex["event"]
+            key = (gene, event)
+            if key not in gene_event_count:
+                gene_event_count[key] = 0
+            gene_event_count[key] += 1
+    return dict(sorted(gene_event_count.items(), key=lambda kv: kv[1], reverse=True))
 
 def process_data(args):
     _graph = args[0]
@@ -513,19 +532,14 @@ def adding_graph_color(graph, dendro):
 
     return graph
 
-
-# # function to save graph as graphml file for cytoscape
-# def save_graph_to_file(graph, path_save) -> None:
-#     graph.write_graphml(f"{path_save}/graph_cytoscape.graphml")
-#     np.save(Path(path_save, "graph.npy"), graph)
-
 # function to save graph as graphml file for cytoscape
-def save_graph_to_file(graph, path_save, name="graph"):
+def save_graph_to_file(graph, path_save, name="graph") -> None:
     path_save = Path(path_save)
     path_save.mkdir(parents=True, exist_ok=True)
-
-    graph.write_graphml(path_save / f"{name}.graphml")
-    np.save(path_save / f"{name}.npy", graph)
+    graphml_path = path_save / f"{name}_cytoscape.graphml"
+    npy_path = path_save / f"{name}.npy"
+    graph.write_graphml(str(graphml_path))
+    np.save(npy_path, graph, allow_pickle=True)
 
 # function to create a map for cluster
 def map_cluster_creation(graph, dendro):
@@ -635,6 +649,28 @@ def degree_variant_cluster(map_cluster, graph, path_save) -> None:
             path_save,
             "variants_degree",
             f"variants_degree_cluster_{cluster_index}.csv",
+        ).open(
+            "w",
+            encoding="utf-8",
+        ) as f:
+            f.write("Variants\tDegree\n")
+            for i, degree in enumerate(degrees):
+                if g_cluster.vs[i]["vertex_type"] != "PATIENT":
+                    f.write(f"{g_cluster.vs[i]['name']}\t{degree}\n")
+
+# Degree of CNV variants per cluster
+def degree_variant_cluster_cnv(map_cluster, graph, path_save) -> None:
+    Path(path_save, "variants_degree_cnv").mkdir(parents=True, exist_ok=True)
+    for cluster_index in map_cluster:
+        list_vertices_filtered = graph.vs.select(
+            lambda x, ci=cluster_index: x["cluster"] == ci,
+        )
+        g_cluster = graph.induced_subgraph(list_vertices_filtered)
+        degrees = g_cluster.degree()
+        with Path(
+            path_save,
+            "variants_degree_cnv",
+            f"variants_degree_cnv_cluster_{cluster_index}.csv",
         ).open(
             "w",
             encoding="utf-8",
@@ -945,12 +981,12 @@ def genes_count_cnv_single_cluster(
     map_cluster_cnv_abs,
     path_save,
 ) -> None:
-    Path(path_save, "count_cnv_cluster_list").mkdir(parents=True, exist_ok=True)
+    Path(path_save, "count_cluster_list_cnv").mkdir(parents=True, exist_ok=True)
     for cluster, infos in map_cluster_cnv_abs.items():
         with Path(
             path_save,
-            "count_cnv_cluster_list",
-            f"count_cnv_cluster_{cluster}.csv",
+            "count_cluster_list_cnv",
+            f"count_cluster_{cluster}.csv",
         ).open(
             "w",
             encoding="utf-8",

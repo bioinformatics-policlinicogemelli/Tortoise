@@ -106,9 +106,13 @@ DF_CLINICAL_DATA = None
 NUMERIC_COLUMNS_CLINICAL = []
 ALL_COLUMNS_CLINICAL = []
 GRAPH = None
+GRAPH_CNV = None
 CLUSTERS_INDEX = []
+CLUSTERS_CNV = []
 CLUSTER_SELECTED = None
+CLUSTER_SEL_CNV = None
 CLUSTER_SELECTED_MULTI = []
+CLUSTER_SEL_CNV_MULTI = []
 BOX_FIG_SELECTED_1 = None
 BOX_FIG_SELECTED_2 = None
 PATH_CONFIG = None
@@ -129,34 +133,34 @@ CONTEXT_DATA = {
 }
 
 
-def filter_graph(cluster):
-    if GRAPH is None:
+def filter_graph(cluster, graph_type="mut"):
+    graph = GRAPH if graph_type == "mut" else GRAPH_CNV
+
+    if graph is None:
         return []
-    list_vertices = GRAPH.vs.select(lambda x: x["cluster"] == cluster)
-    graph_filtered = GRAPH.induced_subgraph(list_vertices)
+
+    list_vertices = graph.vs.select(lambda v: v["cluster"] == cluster)
+    graph_filtered = graph.induced_subgraph(list_vertices)
+
     g_ele = []
-    # convert and add vertex
-    for e in graph_filtered.vs():
+
+    for e in graph_filtered.vs:
         _map = e.attributes()
         _map["id"] = e.index
         _map["variants"] = None
-        g_ele.append(
-            {
-                "data": _map,
-                "classes": e["vertex_type"],
-                "id": e.index,
-                "grabbable": False,
-            },
-        )
-    # convert and add edges
+
+        g_ele.append({
+            "data": _map,
+            "classes": e["vertex_type"],
+            "id": e.index,
+            "grabbable": False,
+        })
+
     g_ele.extend(
-        [
-            {"data": {"source": e.source, "target": e.target}}
-            for e in graph_filtered.es()
-        ],
+        {"data": {"source": e.source, "target": e.target}}
+        for e in graph_filtered.es
     )
     return g_ele
-
 
 # APP + SIDEBAR
 APP = Dash(
@@ -256,6 +260,19 @@ SIDEBAR = html.Div(
                         ),
                     ],
                     href="/cluster_comparision",
+                    active="exact",
+                    className="navbar_entity",
+                ),
+                # CNV PAGE
+                dbc.NavLink(
+                    [
+                        html.I(className="fa-solid fa-circle-nodes"),
+                        html.Span(
+                            "CNV Analysis",
+                            className="navbar_span",
+                        ),
+                    ],
+                    href="/cnv_page",
                     active="exact",
                     className="navbar_entity",
                 ),
@@ -413,6 +430,8 @@ def redirect_pages(pathname):
         selected_page = PAGE_CLINICAL_DATA
     elif pathname == "/survival_analysis":
         selected_page = PAGE_SURVIVAL_ANALYSIS
+    elif pathname == "/cnv_page":
+        selected_page = PAGE_CNV_ANALYSIS
     return selected_page
 
 
@@ -444,7 +463,9 @@ def update_dropdown_liststudy(_):
 def select_study(value) -> str:
     global CONTEXT_DATA
     global GRAPH
+    global GRAPH_CNV
     global CLUSTERS_INDEX
+    global CLUSTERS_CNV
     global DF_CLINICAL_DATA
     global NUMERIC_COLUMNS_CLINICAL
     global ALL_COLUMNS_CLINICAL
@@ -479,12 +500,18 @@ def select_study(value) -> str:
         CONTEXT_DATA["name_study"],
         "output",
     )
-    GRAPH = np.load(
-        CONTEXT_DATA["out_root_path"].joinpath("graph.npy"),
-        allow_pickle="TRUE",
-    ).item()
+    # --- Load mutation graph ---
+    mutation_path = CONTEXT_DATA["out_root_path"] / "graph_mutational.npy"
+    GRAPH = np.load(mutation_path, allow_pickle=True).item()
+    # --- Load CNV graph (optional) ---
+    cnv_path = CONTEXT_DATA["out_root_path"] / "graph_cnv.npy"
+    if cnv_path.exists():
+        GRAPH_CNV = np.load(cnv_path, allow_pickle=True).item()
+    else:
+        GRAPH_CNV = None
 
     CLUSTERS_INDEX = [int(c) for c in set(GRAPH.vs["cluster"])]
+    CLUSTERS_CNV = [int(c) for c in set(GRAPH_CNV.vs["cluster"])] if GRAPH_CNV is not None else []
 
     DF_CLINICAL_DATA = pd.read_csv(
         CONTEXT_DATA["out_root_path"].joinpath("cluster_clinical_data.csv"),
@@ -2643,7 +2670,276 @@ def update_multi_fig(list_clusters: list, col_name: str):
     BOX_FIG_SELECTED_1 = col_name
     return func_multi_plot(list_clusters, col_name)
 
+# PAGE CNV ANALYSIS
+PAGE_CNV_ANALYSIS = [
+    dbc.Modal(
+        id="modal-cnv",
+        size="lg",
+        is_open=False,
+        children=[]
+    ),
 
-# START
+    dbc.Row([
+        dbc.Col([
+            html.H3("CNV Analysis"),
+            html.Span("Cluster selected", className="span_selector"),
+            dcc.Dropdown(id="dd-cnv-cluster"),
+        ], lg=6)
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            html.Span("Number of patients"),
+            html.Hr(),
+            html.Span(0, id="cnv-n-patient"),
+        ], width=2, className="info_block add-border"),
+
+        dbc.Col([
+            html.Span("Number of CNV events"),
+            html.Hr(),
+            html.Span(0, id="cnv-n-events"),
+        ], width=2, className="info_block add-border"),
+
+        dbc.Col([
+            html.Span("Number of genes"),
+            html.Hr(),
+            html.Span(0, id="cnv-n-genes"),
+        ], width=2, className="info_block add-border"),
+
+        dbc.Col([
+            html.Span("CNV centroid"),
+            html.Hr(),
+            html.Span("None", id="cnv-centroid"),
+        ], width=2, className="info_block add-border"),
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            cyto.Cytoscape(
+                id="cytoscape-cnv",
+                className="add-border",
+                style={"width": "100%", "height": "35vh"},
+                stylesheet=[
+                    {"selector": "node", "style": {"content": "data(name)", "font-size": "5px"}},
+                    {"selector": ".PATIENT", "style": {"background-color": "coral", "shape": "triangle"}},
+                    {"selector": ".CNV", "style": {"background-color": "royalblue", "shape": "circle"}},
+                    {"selector": ":selected", "style": {"background-color": "#02cd79"}},
+                ],
+                minZoom=0.1,
+                maxZoom=2,
+            ),
+            dcc.RadioItems(
+                id="radio-cnv-layouts",
+                options=[
+                    {"label": "cose", "value": "cose"},
+                    {"label": "concentric", "value": "concentric"},
+                    {"label": "grid", "value": "grid"},
+                ],
+                value="cose",
+                inline=True
+            ),
+        ], lg=6),
+
+        dbc.Col([
+            dcc.Graph(id="cnv-pie", className="add-border", style={"width": "100%", "height": "35vh"}),
+        ], lg=6),
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id="cnv-degree", className="add-border",
+                      style={"width": "100%", "height": "35vh"}),
+        ], lg=8)
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id="cnv-patient", className="add-border",
+                      style={"width": "100%", "height": "35vh"}),
+        ], lg=12)
+    ])
+]
+
+
+
+@callback(
+    Output("dd-cnv-cluster", "options"),
+    Output("dd-cnv-cluster", "value"),
+    Input("dd-cnv-cluster", "n_clicks")
+)
+def dropdown__cnv_cluster(_):
+    """Dropdown options for CNV cluster selection."""
+    if not CLUSTERS_CNV:
+        return [], None
+    return CLUSTERS_CNV, CLUSTER_SEL_CNV or CLUSTERS_CNV[0]
+
+@callback(
+    Output("modal-cnv", "children"),
+    Output("modal-cnv", "is_open"),
+    Input("cytoscape-cnv", "tapNodeData"),
+    prevent_initial_call=True,
+)
+def display_node_data_cnv(data_dict):
+    temp = ""
+    if data_dict["vertex_type"] == "CNV":
+        term_included = ["name", "gene", "cnv_type"]
+        for k, v in data_dict.items():
+            if k in term_included:
+                temp += f"**{k}**:{v}\n"
+    else:
+        term_excluded = [
+            "vertex_type",
+            "variants",
+            "color_vertex",
+            "shape_vertex",
+            "gene",
+            "sost_amm",
+            "consequence",
+            "color",
+            "cluster",
+            "id",
+            "timeStamp",
+        ]
+        for k, v in data_dict.items():
+            if k not in term_excluded:
+                temp += f"**{k}**:{v}\n"
+
+    return [
+        dbc.ModalHeader(dbc.ModalTitle(data_dict["name"])),
+        dcc.Markdown(temp, className="markdown"),
+    ], True
+
+
+# UPDATE CNV CLUSTER LAYOUT
+@callback(
+    Output("cytoscape-cnv", "layout"),
+    Input("radio-cnv-layouts", "value")
+)
+def update_graph_cnv(layout):
+    return {"name": layout}
+
+
+
+# SELECT CNV CLUSTER INDEX
+@callback(
+    Output("cytoscape-cnv", "elements"),
+    Output("cnv-pie", "figure"),
+    Output("cnv-degree", "figure"),
+    Output("cnv-patient", "figure"),
+    Output("cnv-n-patient", "children"),
+    Output("cnv-n-events", "children"),
+    Output("cnv-n-genes", "children"),
+    Output("cnv-centroid", "children"),
+    Input("dd-cnv-cluster", "value"),
+)
+def update_cluster_cnv(cluster):
+    if cluster is None or GRAPH_CNV is None:
+        return (
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+        )
+
+    global CLUSTER_SEL_CNV
+    CLUSTER_SEL_CNV = cluster
+
+    cluster_elements = filter_graph(cluster, graph_type="cnv")
+
+    df_gene = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "count_cluster_list_cnv",
+            f"count_cluster_{cluster}.csv",
+        ),
+        sep="\t",
+        engine="python",
+    )
+    fig_pie = px.pie(
+        df_gene,
+        values="COUNT",
+        names="CNV GENE",
+        title="CNV events per gene",
+    )
+    fig_pie.update_traces(textposition="inside", textinfo="label")
+
+    df_events = pd.read_csv(
+    Path(
+        CONTEXT_DATA["out_root_path"],
+        "variants_degree_cnv",
+        f"variants_degree_cnv_cluster_{cluster}.csv",
+    ),
+    sep="\t",
+    )
+
+
+    n_events = len(df_events)
+
+    df_plot = df_events.sort_values("Degree", ascending=False).head(15)
+
+    fig_degree = px.bar(
+    df_plot,
+    x="Variants",
+    y="Degree",
+    title="CNV degree",
+    )
+
+
+    n_patients = sum(
+        1 for e in cluster_elements
+        if e["data"].get("vertex_type") == "PATIENT"
+    )
+    n_genes = len(df_gene)
+
+    # Calculate CNV events per patient
+    cnv_per_patient = {}
+    for e in cluster_elements:
+        if e["data"].get("vertex_type") == "PATIENT":
+            patient = e["data"].get("name")
+            # Count edges connected to this patient
+            patient_degree = 0
+            for edge_elem in cluster_elements:
+                if "source" in edge_elem["data"] and "target" in edge_elem["data"]:
+                    if edge_elem["data"]["target"] == e["id"] or edge_elem["data"]["source"] == e["id"]:
+                        # Check if connected to a CNV node
+                        other_id = edge_elem["data"]["source"] if edge_elem["data"]["target"] == e["id"] else edge_elem["data"]["target"]
+                        for other_e in cluster_elements:
+                            if "id" in other_e and other_e["id"] == other_id and other_e["data"].get("vertex_type") == "CNV":
+                                patient_degree += 1
+            if patient_degree > 0:
+                cnv_per_patient[patient] = patient_degree
+
+    if cnv_per_patient:
+        df_patient_cnv = pd.DataFrame(list(cnv_per_patient.items()), columns=["Patient", "CNV Events"])
+        df_patient_cnv = df_patient_cnv.sort_values("CNV Events", ascending=False)
+        fig_patient_cnv = px.bar(
+            df_patient_cnv,
+            x="Patient",
+            y="CNV Events",
+            title="CNV events per patient",
+        )
+    else:
+        fig_patient_cnv = px.bar(title="CNV events per patient")
+
+    if len(df_plot) >= 2 and df_plot.iloc[0]["Degree"] == df_plot.iloc[1]["Degree"]:
+        centroid = "More than one"
+    elif len(df_plot) >= 1:
+        centroid = df_plot.iloc[0]["Variants"]
+    else:
+        centroid = "None"
+    return (
+        cluster_elements,
+        fig_pie,
+        fig_degree,
+        fig_patient_cnv,
+        n_patients,
+        n_events,
+        n_genes,
+        centroid,
+    )# START
 if __name__ == "__main__":
     APP.run(debug=False, host="0.0.0.0", port=8593)
