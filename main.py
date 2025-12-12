@@ -3,62 +3,58 @@
 
 The application includes multiple pages for different types of analysis,
 including study creation, study description, pathway analysis,
-clinical data visualization, survival analysis, and cluster comparison.
+clinical data visualization, survival analysis, cluster comparison,
+and CNV (Copy Number Variation) analysis.
 
-Modules:
-    - base64
-    - io
-    - json
-    - os
-    - dash_bootstrap_components as dbc
-    - dash_cytoscape as cyto
-    - matplotlib
-    - matplotlib.pyplot as plt
-    - numpy as np
-    - pandas as pd
-    - plotly.express as px
-    - plotly.graph_objects as go
-    - tap
-    - dash
-    - lifelines
-    - lifelines.statistics
-    - plotly.subplots
-    - lib.venn as venn
-Functions:
-    - filter_graph(cluster): Filters the graph based on the selected cluster.
-    - redirect_pages(pathname): Redirects to the page based on the URL.
-    - update_dropdown_liststudy(): Updates the dropdown list of studies.
-    - select_study(value): Selects a study and loads its data.
-    - update_mutational_file(filename): Updates mutational file component.
-    - update_clinical_patient_file(filename): Updates patient file component.
-    - update_clinical_sample_file(filename): Updates sample file component.
-    - update_val_col_patient_name(data, sep, skip): Updates dropdown options.
-    - update_val_col_sample_name(data, sep, skip): Updates dropdown options.
-    - update_list_columns_mutation(data, sep, skip): Updates dropdown options.
-    - create_study(...): Creates a new study based on the provided data.
-    - dropdpwn_cluster(): Updates the cluster dropdown options.
-    - display_node_data(data_dict): Displays data for the selected node.
-    - update_graph(layout): Updates the graph layout.
-    - update_cluster(cluster): Updates the cluster elements and figures.
-    - update_go(cluster, pvalue, adj_pvalue, p_type): Updates the GO plot.
-    - update_kegg(cluster, pvalue, adj_pvalue): Updates KEGG plot.
-    - update_reactome(cluster, pvalue, adj_pvalue): Updates REACTOME plot.
-    - update_wiki(cluster, pvalue, adj_pvalue): Updates WIKI plot.
-    - dropdown_box_fig_1(): Updates dropdown options.
-    - dropdown_box_fig_2(): Updates dropdown options.
-    - func_single_plot(cluster, col_name): Generates a single cluster plot.
-    - update_box_1(cluster, col_name): Updates the first box plot.
-    - update_box_2(cluster, col_name): Updates the second box plot.
-    - update_table_clinical_data(cluster): Updates the clinical data table.
-    - update_overall_survival(cluster): Updates survival plot and statistics.
-    - update_survival_comparison(list_clusters): Updates the survival plot.
-    - update_venn(list_clusters): Updates the Venn diagram for gene.
-    - update_genes_common(list_clusters): Updates the table of common genes.
-    - func_multi_plot(list_clusters, col_name): Generates multi-cluster plot.
-    - update_multi_fig(list_clusters, col_name): Updates multi-cluster plot.
-Usage:
-    Run this script to start the Dash web application.
-    The application will be available at http://127.0.0.1:8593.
+Features:
+    - Interactive network visualization using Cytoscape
+    - Mutation and CNV analysis with cluster visualization
+    - Clinical data integration and display
+    - Survival analysis with log-rank statistics
+    - Pathway enrichment analysis (GO, KEGG, REACTOME, WIKI)
+    - CNV events per patient visualization
+    - Venn diagram analysis for cluster comparison
+    - Multi-cluster comparison and visualization
+
+Key Functions:
+    - filter_graph(cluster, graph_type): Filters graph based on cluster and type
+    - redirect_pages(pathname): Routes to appropriate page based on URL
+    - select_study(value): Loads study data and initializes analysis
+    - update_cluster(cluster): Updates mutation cluster visualization
+    - update_cluster_cnv(cluster): Updates CNV cluster with patient event counts
+    - update_overall_survival(cluster): Generates survival curves
+    - update_survival_comparison(list_clusters): Compares survival across clusters
+    - update_venn(list_clusters): Generates Venn diagrams
+    - update_genes_common(list_clusters): Lists common genes across clusters
+    - update_go/update_kegg/update_reactome/update_wiki: Pathway enrichment plots
+    - func_single_plot/func_multi_plot: Clinical data box plots
+    - update_table_clinical_data: Displays clinical data tables
+    - generate_pathway_fig: Helper for pathway figure generation
+
+Data Upload Functions:
+    - create_study: Creates new study with uploaded data files
+    - update_list_columns_patient_name: Updates patient name dropdown
+    - update_list_columns_sample_name: Updates sample name dropdown
+    - update_list_columns_mutation: Updates mutation column dropdown
+    - update_list_columns_cnv_identifier: Updates CNV identifier dropdown
+    - confirm_study_prompt: Confirms and initializes study
+
+Node Display Functions:
+    - display_node_data: Shows details for selected mutation nodes
+    - display_node_data_cnv: Shows details for selected CNV nodes
+
+Dropdown/Selector Functions:
+    - update_dropdown_liststudy: Updates available studies list
+    - dropdpwn_cluster: Updates mutation cluster dropdown
+    - dropdown__cnv_cluster: Updates CNV cluster dropdown
+    - dropdpwn_multi_cluster: Updates multi-cluster selector
+    - dropdown_box_fig_1/dropdown_box_fig_2: Updates clinical variable dropdowns
+
+Utility Functions:
+    - count_unique_patients: Counts unique patients in filtered data
+    - update_graph: Updates graph layout for mutations
+    - update_graph_cnv: Updates graph layout for CNV
+    - update_box_1/update_box_2: Updates clinical data plots
 """
 
 import base64

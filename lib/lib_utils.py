@@ -17,10 +17,16 @@ Functions:
       absent.
     - create_maps(data_mutational, column_mutation, column_gene, column_sample,
       vaf_score, column_vaf): Create maps for variants and patients.
+    - create_cnv_map(d_cnv): Create maps for CNV genes and patients from CNV
+      data.
     - graph_creation(map_patients, map_variants): Create a graph from the maps
       of patients and variants.
+    - graph_cnv(map_pat, map_cnv): Create a graph from the maps of patients and
+      CNV genes.
     - count_gene(graph): Count the genes present in relation to individual
       mutations.
+    - count_gene_cnv(graph): Count CNV genes by their event type (Gain, Loss,
+      etc.) from the CNV graph.
     - process_data(args): Process data for modularity calculation using the
       Leiden algorithm.
     - selected_seed(g): Select the seed that gives the highest modularity value
@@ -39,6 +45,8 @@ Functions:
       to a file.
     - degree_variant_cluster(map_cluster, graph, path_save): Write the degree
       of each variant in the cluster to a file.
+    - degree_variant_cluster_cnv(map_cluster, graph, path_save): Write the
+      degree of each CNV variant in the cluster to a file.
     - enriched_sample_data(data_sample, map_patient, sample_name): Add clinical
       sample information to the patient map.
     - enriched_patient_data(data_patient, map_patient, patient_name): Add
@@ -53,10 +61,17 @@ Functions:
       of mutations and patients for each cluster.
     - count_gene_abs_percent(g, map_cluster, gene_total_count, path_save):
       Count the absolute and percentage presence of genes in each cluster.
+    - count_gene_abs_percent_cnv(g, map_cluster, gene_total_count_gl, path_save):
+      Count the absolute and percentage presence of CNV genes and events in each
+      cluster.
     - genes_single_cluster(g, map_cluster, path_save): Create a file for each
       cluster containing the genes present.
+    - genes_single_cluster_cnv(g, map_cluster, path_save): Create a file for
+      each cluster containing the CNV genes present.
     - genes_count_mutation_single_cluster(map_cluster_gene_abs, path_save):
       Create a file for each cluster counting the number of mutations per gene.
+    - genes_count_cnv_single_cluster(map_cluster_cnv_abs, path_save): Create a
+      file for each cluster counting the number of CNV events per gene.
     - cluster_noded_attributes(g, map_patient, map_variant): Add cluster
       attributes to the nodes of the graph.
 """

@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
 """Module that creates graphs and performs clustering and enrichment analysis.
 
+This module processes mutational and clinical data, creates bipartite graphs
+(patients-variants for mutations and patients-genes for CNV), performs Leiden
+clustering, and analyzes gene/CNV enrichment by cluster.
+
 Functions:
+    main(path_config): Main function to process data and perform analysis.
+        Handles both mutation and optional CNV data to create and analyze graphs.
     load_df(config): Loads mutational and clinical data from CSV files.
     filter_vaf(config, df_mut): Filters mutations based on VAF score.
     enrichment_with_r(path_save, map_c): Performs enrichment analysis.
-    main(path_config): Main function to process data and perform analysis.
+
+Features:
+    - Mutation graph analysis: Creates bipartite graphs of patients and variants
+    - CNV analysis: Optional Copy Number Variation analysis with separate graph
+    - Leiden clustering: Community detection with seed optimization
+    - Enrichment analysis: Gene set enrichment using R scripts
+    - Output generation: CSV files with cluster statistics and centroids
 
 Usage:
     Run this module as a script with the required configuration file path:
