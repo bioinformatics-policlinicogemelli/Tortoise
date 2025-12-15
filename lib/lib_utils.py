@@ -293,9 +293,9 @@ def preprocess_cnv(data_cnv, column_cnv_gene=None):
       - Set gene index
       - Keep patient columns
       - Convert CNV numeric values into Gain/Loss categories:
-            -2, -1 → "Loss"
-             1,  2 → "Gain"
-             0, NaN → removed (kept as NaN)
+            -2 → "Loss"
+             2 → "Gain"
+             1, -1, 0, NaN → removed (kept as NaN)
       - Returns categorical CNV dataframe ready for mapping
     """
 
@@ -322,8 +322,8 @@ def preprocess_cnv(data_cnv, column_cnv_gene=None):
     # 5. Convert CNV values → categories
     d_cnv = d_cnv.replace({
         -2: "Loss",
-        -1: "Loss",
-         1: "Gain",
+        -1: np.nan, # -1 does not interest us
+         1: np.nan, # 1 does not interest us
          2: "Gain",
          0: np.nan   # 0 does not interest us
     })
