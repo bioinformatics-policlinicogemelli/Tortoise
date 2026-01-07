@@ -196,6 +196,7 @@ def main(path_config: Path) -> None:
     libu.degree_variant_cluster(map_c, g, path_save)
 
     if cnv_available:
+        libu.numerosity_info_cnv(g2, map_c2, path_save)
         map_cluster_cnv_abs, _ = libu.count_gene_abs_percent_cnv(
             g2,
             map_c2,

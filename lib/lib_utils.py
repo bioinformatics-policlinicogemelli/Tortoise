@@ -690,9 +690,9 @@ def degree_variant_cluster_cnv(map_cluster, graph, path_save) -> None:
             "w",
             encoding="utf-8",
         ) as f:
-            f.write("Variants\tDegree\n")
+            f.write("CNV\tDegree\n")
             for i, degree in enumerate(degrees):
-                if g_cluster.vs[i]["vertex_type"] != "PATIENT":
+                if g_cluster.vs[i]["vertex_type"] == "CNV":
                     f.write(f"{g_cluster.vs[i]['name']}\t{degree}\n")
 
 # number of connection fo each cluster
@@ -809,6 +809,38 @@ def numerosity_info(g, map_cluster, path_save) -> None:
                 + "\n",
             )
 
+# funzione che crea un file per la numerosity dei CNV per cluster
+def numerosity_info_cnv(g, map_cluster, path_save) -> None:
+    with Path(path_save, "numerosity_cluster_cnv.csv").open(
+        "w",
+        encoding="utf-8",
+    ) as f:
+        f.write("Cluster\tPatient\tCNV\n")
+        for cluster in map_cluster:
+            count_cnv = len(
+                [
+                    v
+                    for v in g.vs
+                    if v["cluster"] == cluster
+                    and v["vertex_type"] == "CNV"
+                ],
+            )
+            count_patient = len(
+                [
+                    v
+                    for v in g.vs
+                    if v["cluster"] == cluster
+                    and v["vertex_type"] == "PATIENT"
+                ],
+            )
+            f.write(
+                str(cluster)
+                + "\t"
+                + str(count_patient)
+                + "\t"
+                + str(count_cnv)
+                + "\n",
+            )
 
 # riassunto delle informazioni (mutazioni e pazienti per ciascun cluster)
 def summary_info(g, map_cluster, patient_column, path_save) -> None:

@@ -119,12 +119,16 @@ CONTEXT_DATA = {
     "name_study_input": None,
     "list_studies": [],
     "out_root_path": None,
-    "stats": {
-        "num_patient": 0,
-        "num_gene": 0,
-        "num_variant": 0,
-        "num_cluster": 0,
-        "modularity": 0,
+    "data": {
+        "stats_mut": {
+            "num_patient": 0,
+            "num_gene": 0,
+            "num_variant": 0,
+            "num_cluster": 0,
+            "modularity": 0,
+            "seed": 0,
+        },
+        "stats_cnv": None,
     },
 }
 
@@ -157,6 +161,20 @@ def filter_graph(cluster, graph_type="mut"):
         for e in graph_filtered.es
     )
     return g_ele
+
+def build_cnv_block():
+    cnv_stats = CONTEXT_DATA["data"]["stats_cnv"]
+    if cnv_stats is None:
+        return None
+
+    return html.Div([
+        html.H2("CNV summary"),
+        html.Div(f"Number of patients: {cnv_stats['num_patient']}"),
+        html.Div(f"Number of CNV events: {cnv_stats['num_cnv']}"),
+        html.Div(f"Number of clusters: {cnv_stats['num_cluster']}"),
+        html.Div(f"Cluster modularity: {cnv_stats['modularity']}"),
+        html.Div(f"Cluster seed: {cnv_stats['seed']}"),
+    ])
 
 # APP + SIDEBAR
 APP = Dash(
@@ -397,6 +415,16 @@ PAGE_HOME = [
             ),
         ],
     ),
+    # CNV STATS
+    dbc.Row(
+    [
+        html.Span(
+            id="dd-study-info-cnv",
+            className="dd_study_infos",
+        ),
+    ],
+)
+
 ]
 
 
@@ -454,6 +482,7 @@ def update_dropdown_liststudy(_):
     Output("dd-study-info-modularity", "children"),
     Output("dd-study-info-seed", "children"),
     Output("dd-study-info-resolution", "children"),
+    Output("dd-study-info-cnv", "children"),
     Input("dd-study", "value"),
 )
 def select_study(value) -> str:
@@ -471,18 +500,19 @@ def select_study(value) -> str:
     global BOX_FIG_SELECTED_2
 
     if value is None:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     # prevent reload
     if value == CONTEXT_DATA["name_study"]:
         return (
             f"Study {value}",
-            f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
-            f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
-            f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
-            f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
-            f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
-            f"Seed: {CONTEXT_DATA['stats']['seed']}",
+            f"Number of patients: {CONTEXT_DATA['data']['stats_mut']['num_patient']}",
+            f"Number of genes: {CONTEXT_DATA['data']['stats_mut']['num_gene']}",
+            f"Number of variants: {CONTEXT_DATA['data']['stats_mut']['num_variant']}",
+            f"Number of clusters: {CONTEXT_DATA['data']['stats_mut']['num_cluster']}",
+            f"Cluster modularity: {CONTEXT_DATA['data']['stats_mut']['modularity']}",
+            f"Seed: {CONTEXT_DATA['data']['stats_mut']['seed']}",
             f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
+            build_cnv_block(),
         )
 
     # Load config
@@ -505,7 +535,37 @@ def select_study(value) -> str:
         GRAPH_CNV = np.load(cnv_path, allow_pickle=True).item()
     else:
         GRAPH_CNV = None
+    # --- CNV stats ---
+    if GRAPH_CNV is not None:
+        stats_cnv = pd.read_csv(
+            CONTEXT_DATA["out_root_path"] / "numerosity_cluster_cnv.csv",
+            sep="\t",
+            engine="python",
+        )
 
+        # Read modularity from modularity_cnv.info
+        modularity_cnv = None
+        modularity_cnv_path = CONTEXT_DATA["out_root_path"] / "modularity_cnv.info"
+        if modularity_cnv_path.exists():
+            with modularity_cnv_path.open("r") as f:
+                modularity_cnv = f.readline()
+
+        # Read seed from seed_cnv.info
+        seed_cnv = None
+        seed_cnv_path = CONTEXT_DATA["out_root_path"] / "seed_cnv.info"
+        if seed_cnv_path.exists():
+            with seed_cnv_path.open("r") as f:
+                seed_cnv = f.readline()
+
+        CONTEXT_DATA["data"]["stats_cnv"] = {
+            "num_patient": int(stats_cnv["Patient"].sum()),
+            "num_cnv": int(stats_cnv["CNV"].sum()),
+            "num_cluster": len(stats_cnv),
+            "modularity": modularity_cnv,
+            "seed": seed_cnv,
+        }
+    else:
+        CONTEXT_DATA["data"]["stats_cnv"] = None
     CLUSTERS_INDEX = [int(c) for c in set(GRAPH.vs["cluster"])]
     CLUSTERS_CNV = [int(c) for c in set(GRAPH_CNV.vs["cluster"])] if GRAPH_CNV is not None else []
 
@@ -538,32 +598,33 @@ def select_study(value) -> str:
         sep="\t",
         engine="python",
     )
-    CONTEXT_DATA["stats"]["num_patient"] = stats["Patient"].sum()
-    CONTEXT_DATA["stats"]["num_gene"] = stats["Gene"].sum()
-    CONTEXT_DATA["stats"]["num_variant"] = stats["Variant"].sum()
-    CONTEXT_DATA["stats"]["num_cluster"] = len(stats)
+    CONTEXT_DATA["data"]["stats_mut"]["num_patient"] = stats["Patient"].sum()
+    CONTEXT_DATA["data"]["stats_mut"]["num_gene"] = stats["Gene"].sum()
+    CONTEXT_DATA["data"]["stats_mut"]["num_variant"] = stats["Variant"].sum()
+    CONTEXT_DATA["data"]["stats_mut"]["num_cluster"] = len(stats)
     with (
         CONTEXT_DATA["out_root_path"]
         .joinpath("modularity.info")
         .open("r") as f
     ):
-        CONTEXT_DATA["stats"]["modularity"] = f.readline()
+        CONTEXT_DATA["data"]["stats_mut"]["modularity"] = f.readline()
     with (
         CONTEXT_DATA["out_root_path"]
         .joinpath("seed.info")
         .open("r") as f
     ):
-        CONTEXT_DATA["stats"]["seed"] = f.readline()
+        CONTEXT_DATA["data"]["stats_mut"]["seed"] = f.readline()
       
     return (
         f"Study {value}",
-        f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
-        f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
-        f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
-        f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
-        f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
-        f"Seed: {CONTEXT_DATA['stats']['seed']}",
+        f"Number of patients: {CONTEXT_DATA['data']['stats_mut']['num_patient']}",
+        f"Number of genes: {CONTEXT_DATA['data']['stats_mut']['num_gene']}",
+        f"Number of variants: {CONTEXT_DATA['data']['stats_mut']['num_variant']}",
+        f"Number of clusters: {CONTEXT_DATA['data']['stats_mut']['num_cluster']}",
+        f"Cluster modularity: {CONTEXT_DATA['data']['stats_mut']['modularity']}",
+        f"Seed: {CONTEXT_DATA['data']['stats_mut']['seed']}",
         f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
+        build_cnv_block(),
     )
 
 
@@ -2864,24 +2925,23 @@ def update_cluster_cnv(cluster):
     fig_pie.update_traces(textposition="inside", textinfo="label")
 
     df_events = pd.read_csv(
-    Path(
-        CONTEXT_DATA["out_root_path"],
-        "variants_degree_cnv",
-        f"variants_degree_cnv_cluster_{cluster}.csv",
-    ),
-    sep="\t",
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "variants_degree_cnv",
+            f"variants_degree_cnv_cluster_{cluster}.csv",
+        ),
+        sep="\t",
     )
-
 
     n_events = len(df_events)
 
     df_plot = df_events.sort_values("Degree", ascending=False).head(15)
 
     fig_degree = px.bar(
-    df_plot,
-    x="Variants",
-    y="Degree",
-    title="CNV degree",
+        df_plot,
+        x="CNV",
+        y="Degree",
+        title="CNV degree",
     )
 
 
@@ -2924,7 +2984,7 @@ def update_cluster_cnv(cluster):
     if len(df_plot) >= 2 and df_plot.iloc[0]["Degree"] == df_plot.iloc[1]["Degree"]:
         centroid = "More than one"
     elif len(df_plot) >= 1:
-        centroid = df_plot.iloc[0]["Variants"]
+        centroid = df_plot.iloc[0]["CNV"]
     else:
         centroid = "None"
     return (
