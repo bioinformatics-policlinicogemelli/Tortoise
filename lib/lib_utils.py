@@ -72,6 +72,125 @@ import numpy as np
 import pandas as pd
 from rpy2 import robjects
 
+# ============================================================
+# MULTI-RESOLUTION CLUSTERING (ADD-ON, NON USATO DI DEFAULT)
+# ============================================================
+
+def multi_resolution_clustering(
+    graph,
+    resolutions,
+    seed_trials,
+    path_save,
+):
+    """
+    Perform Leiden clustering at multiple resolutions and extract
+    centroid clusters.
+
+    For each resolution:
+    - selects best seed (max modularity)
+    - performs Leiden clustering
+    - identifies centroid cluster (highest-degree VARIANT)
+    - extracts PATIENT sample IDs
+    - writes a TSV with one column per resolution
+
+    Output:
+        resolution_centroids.tsv
+    """
+
+    centroid_samples = {}
+
+    for res in resolutions:
+        print(f"[RESOLUTION] Processing resolution {res}")
+
+        # ---------------------------
+        # SEED SELECTION
+        # ---------------------------
+        def _process(args):
+            g, seed, resolution = args
+            random.seed(seed)
+            np.random.seed(seed)
+            d = g.community_leiden(
+                objective_function="modularity",
+                resolution_parameter=resolution,
+            )
+            return d.modularity
+
+        data = [(graph, s, res) for s in range(seed_trials)]
+
+        if sys.platform.startswith(("linux", "win")):
+            with Pool() as p:
+                modularities = p.map(_process, data)
+        else:
+            modularities = [_process(d) for d in data]
+
+        best_seed = modularities.index(max(modularities))
+
+        # ---------------------------
+        # FINAL CLUSTERING
+        # ---------------------------
+        random.seed(best_seed)
+        dendro = graph.community_leiden(
+            objective_function="modularity",
+            resolution_parameter=res,
+        )
+
+        # ---------------------------
+        # PER-CLUSTER CENTROIDS
+        # ---------------------------
+        for cluster_id in range(len(dendro)):
+            sub = dendro.subgraph(cluster_id)
+
+            # calcolo degree massimo tra le VARIANT
+            max_degree = -1
+            centroid_genes = set()
+
+            for v in sub.vs:
+                if v["vertex_type"] == "VARIANT":
+                    deg = sub.degree(v.index)
+                    if deg > max_degree:
+                        max_degree = deg
+                        centroid_genes = {v["gene"]}
+                    elif deg == max_degree:
+                        centroid_genes.add(v["gene"])
+
+            if not centroid_genes:
+                continue  # cluster senza varianti (caso raro)
+
+            # sampleID del cluster
+            samples = [
+                v["name"]
+                for v in sub.vs
+                if v["vertex_type"] == "PATIENT"
+            ]
+
+            if not samples:
+                continue
+
+            # header colonna
+            gene_label = "-".join(sorted(centroid_genes))
+            column_name = f"{gene_label}_cluster{cluster_id}_{res}"
+
+            centroid_samples[column_name] = sorted(samples)
+
+    # ---------------------------
+    # WRITE TSV (ALL RESOLUTIONS)
+    # ---------------------------
+    max_len = max(len(v) for v in centroid_samples.values())
+
+    df = pd.DataFrame(
+        {
+            k: v + [""] * (max_len - len(v))
+            for k, v in centroid_samples.items()
+        }
+    )
+
+    out_file = Path(path_save, "resolution_centroids.tsv")
+    df.to_csv(out_file, sep="\t", index=False)
+
+    print(f"[DONE] Resolution analysis saved to {out_file}")
+
+
+
 def load_df(config):
     """Load dataframes from CSV files based on the provided configuration.
 
@@ -693,3 +812,118 @@ def cluster_noded_attributes(g, map_patient, map_variant):
         else:
             v["cluster"] = map_variant[v["name"]]["cluster"]
     return g
+
+
+def gene_centroid_stability(path_save):
+    """
+    Computes gene centroid stability across resolutions.
+
+    Output:
+        gene_centroid_stability.tsv
+    """
+
+    path = Path(path_save, "resolution_centroids.tsv")
+    df = pd.read_csv(path, sep="\t")
+
+    gene_counts = {}
+    resolution_set = set()
+
+    for col in df.columns:
+        # esempio: TP53-BRCA1_cluster2_0.6
+        gene_part, _, res = col.rpartition("_")
+        genes = gene_part.split("_")[0].split("-")
+        resolution_set.add(res)
+
+        for g in genes:
+            gene_counts[g] = gene_counts.get(g, 0) + 1
+
+    total_resolutions = len(resolution_set)
+
+    out = pd.DataFrame(
+        {
+            "gene": gene_counts.keys(),
+            "stability": [
+                gene_counts[g] / total_resolutions for g in gene_counts
+            ],
+        }
+    ).sort_values("stability", ascending=False)
+
+    out.to_csv(
+        Path(path_save, "gene_centroid_stability.tsv"),
+        sep="\t",
+        index=False,
+    )
+
+
+def centroid_overlap_matrix(path_save):
+    """
+    Computes Jaccard overlap between centroid sample sets
+    across resolutions.
+
+    Output:
+        centroid_overlap.tsv
+    """
+
+    df = pd.read_csv(
+        Path(path_save, "resolution_centroids.tsv"),
+        sep="\t",
+    )
+
+    # mappa: resolution -> set(sampleID)
+    res_map = {}
+
+    for col in df.columns:
+        res = col.rpartition("_")[2]
+        samples = set(df[col].dropna()) - {""}
+        res_map.setdefault(res, set()).update(samples)
+
+    resolutions = sorted(res_map.keys())
+    matrix = []
+
+    for r1 in resolutions:
+        row = []
+        for r2 in resolutions:
+            inter = len(res_map[r1] & res_map[r2])
+            union = len(res_map[r1] | res_map[r2])
+            row.append(inter / union if union else 0)
+        matrix.append(row)
+
+    out = pd.DataFrame(matrix, index=resolutions, columns=resolutions)
+    out.to_csv(
+        Path(path_save, "centroid_overlap.tsv"),
+        sep="\t",
+    )
+
+
+def select_best_resolution(path_save):
+    """
+    Selects best resolution based on:
+    - centroid stability
+    - overlap plateau
+
+    Output:
+        best_resolution.info
+    """
+
+    stability = pd.read_csv(
+        Path(path_save, "gene_centroid_stability.tsv"),
+        sep="\t",
+    )
+
+    overlap = pd.read_csv(
+        Path(path_save, "centroid_overlap.tsv"),
+        sep="\t",
+        index_col=0,
+    )
+
+    # score = media overlap + media stability
+    overlap_score = overlap.mean(axis=1)
+    stability_score = stability.groupby("gene")["stability"].mean().mean()
+
+    scores = overlap_score + stability_score
+
+    best_res = scores.idxmax()
+
+    with open(Path(path_save, "best_resolution.info"), "w") as f:
+        f.write(str(best_res))
+

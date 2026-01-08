@@ -18,6 +18,8 @@ import logging
 from pathlib import Path
 
 import lib.lib_utils as libu
+import numpy as np
+
 
 logger = logging.getLogger("tortoise")
 logging.basicConfig(
@@ -78,6 +80,35 @@ def main(path_config: Path) -> None:
     # cluster
     logger.info(" 40% -- Create graph")
     g = libu.graph_creation(map_patients, map_variants)
+
+    # ============================================================
+    # MULTI-RESOLUTION ANALYSIS (ADD-ON, NON INFLUENZA PIPELINE)
+    # ============================================================
+    try:
+        logger.info(" 45% -- Multi-resolution clustering analysis")
+
+        # range di risoluzioni: 0.2 → 2.0 (step 0.1)
+        resolutions = np.round(
+            np.arange(0.1, 1.01, 0.1),
+            2,
+        ).tolist()
+
+        libu.multi_resolution_clustering(
+            graph=g,
+            resolutions=resolutions,
+            seed_trials=config["seed_trials"],
+            path_save=path_save,
+        )
+        libu.gene_centroid_stability(path_save)
+        libu.centroid_overlap_matrix(path_save)
+        libu.select_best_resolution(path_save)
+
+
+    except Exception as e:
+        logger.warning(
+            f"Multi-resolution analysis skipped due to error: {e}",
+        )
+
     logger.info(" 50% -- Clustering")
     best_seed = libu.selected_seed(g, config["seed_trials"], config["clustering_resolution"])
     dendro = libu.leiden_clustering(g, best_seed, config["clustering_resolution"])
