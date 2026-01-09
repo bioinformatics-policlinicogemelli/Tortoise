@@ -2570,31 +2570,65 @@ PAGE_RESOLUTION_OVERVIEW = html.Div(
 PAGE_RESOLUTION_GENE = html.Div(
     [
         html.H2("Gene Stability"),
-        html.P("Gene-centroid stability across resolutions."),
+
+        html.Hr(),
+
+        html.H4("Gene-centroid stability across resolutions"),
+        html.Img(
+            id="gene-stability-heatmap",
+            style={"maxWidth": "100%", "height": "auto"},
+        ),
+
+        html.Hr(),
+
+        html.H4("Gene stability table"),
+        html.Div(id="gene-stability-table"),
     ]
 )
 
 PAGE_RESOLUTION_CLUSTER = html.Div(
     [
         html.H2("Cluster Stability"),
-        html.P("Cluster-level centroid stability across resolutions."),
+
+        html.Hr(),
+
+        html.H4("Cluster-centroid stability across resolutions"),
+        html.Img(
+            id="cluster-stability-heatmap",
+            style={"maxWidth": "100%", "height": "auto"},
+        ),
     ]
 )
 
 PAGE_RESOLUTION_SANKEY = html.Div(
     [
         html.H2("Sankey Flow"),
-        html.P("Patient flow across gene-centric clusters."),
+
+        html.Hr(),
+
+        html.P(
+            "Patient flow across gene-centric clusters "
+            "from high to low resolution."
+        ),
+
+        html.Iframe(
+            id="sankey-iframe",
+            style={
+                "width": "100%",
+                "height": "900px",
+                "border": "none",
+            },
+        ),
     ]
 )
 
 @callback(
     Output("best-resolution-text", "children"),
     Output("resolution-gene-curve", "src"),
-    Input("dd-study", "value"),
+    Input("url", "pathname"),
 )
-def update_resolution_overview(study_name):
-    if study_name is None or CONTEXT_DATA["out_root_path"] is None:
+def update_resolution_overview(_):
+    if CONTEXT_DATA["out_root_path"] is None:
         return "No study selected.", None
 
     out_path = Path(CONTEXT_DATA["out_root_path"])
@@ -2616,6 +2650,73 @@ def update_resolution_overview(study_name):
     curve_img = load_png_as_base64(curve_path)
 
     return best_text, curve_img
+
+@callback(
+    Output("gene-stability-heatmap", "src"),
+    Output("gene-stability-table", "children"),
+    Input("url", "pathname"),
+)
+def update_gene_stability_page(_):
+    if CONTEXT_DATA["out_root_path"] is None:
+        return None, "No study selected."
+
+    out_path = Path(CONTEXT_DATA["out_root_path"])
+
+    # -------------------------
+    # Heatmap
+    # -------------------------
+    heatmap_path = out_path / "gene_centroid_resolution_heatmap.png"
+    heatmap_img = load_png_as_base64(heatmap_path)
+
+    # -------------------------
+    # Stability table
+    # -------------------------
+    tsv_path = out_path / "gene_centroid_stability.tsv"
+    if not tsv_path.exists():
+        return heatmap_img, "Gene stability table not available."
+
+    df = pd.read_csv(tsv_path, sep="\t")
+
+    table = dbc.Table.from_dataframe(
+        df.round(3),
+        striped=True,
+        bordered=True,
+        hover=True,
+        responsive=True,
+    )
+
+    return heatmap_img, table
+
+@callback(
+    Output("cluster-stability-heatmap", "src"),
+    Input("url", "pathname"),
+)
+def update_cluster_stability_page(_):
+    if CONTEXT_DATA["out_root_path"] is None:
+        return None
+
+    out_path = Path(CONTEXT_DATA["out_root_path"])
+
+    heatmap_path = out_path / "cluster_centroid_resolution_heatmap.png"
+    heatmap_img = load_png_as_base64(heatmap_path)
+
+    return heatmap_img
+
+@callback(
+    Output("sankey-iframe", "srcDoc"),
+    Input("url", "pathname"),
+)
+def update_sankey_page(_):
+    if CONTEXT_DATA["out_root_path"] is None:
+        return "<p>No study selected.</p>"
+
+    out_path = Path(CONTEXT_DATA["out_root_path"])
+    sankey_path = out_path / "sankey_gene_centroid_flow.html"
+
+    if not sankey_path.exists():
+        return "<p>Sankey plot not available.</p>"
+
+    return sankey_path.read_text()
 
 
 # START
