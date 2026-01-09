@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Dash web application for visualizing and analyzing data.
 
+
+
 The application includes multiple pages for different types of analysis,
 including study creation, study description, pathway analysis,
 clinical data visualization, survival analysis, cluster comparison,
