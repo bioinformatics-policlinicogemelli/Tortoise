@@ -929,6 +929,68 @@ PAGE_CREATE_STUDY = [
             ),
         ],
     ),
+    # CNV FILE
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("File CNV:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    du.Upload(
+                        id="cnv-file",
+                        text="Upload CNV File",
+                        chunk_size=100,
+                    ),
+                ],
+                width=3,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        ["\\t", ",", ";"],
+                        placeholder="Select separator",
+                        id="cnv-separator",
+                    ),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Input(
+                        id="cnv-skiprow",
+                        type="number",
+                        placeholder="Skiprows",
+                        min=0,
+                    ),
+                ],
+                width=2,
+            ),
+        ],
+    ),
+    # CNV IDENTIFIER
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("CNV Identifier:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        options=[],
+                        id="dd-column-cnv-identifier",
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
     # CREATE STUDY BUTTON
     dbc.Row(
         [
