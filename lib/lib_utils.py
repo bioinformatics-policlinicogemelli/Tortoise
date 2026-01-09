@@ -927,3 +927,405 @@ def select_best_resolution(path_save):
     with open(Path(path_save, "best_resolution.info"), "w") as f:
         f.write(str(best_res))
 
+def gene_centroid_resolution_heatmap(path_save):
+    """
+    Creates a gene-centroid vs resolution heatmap.
+
+    Output:
+        gene_centroid_resolution.tsv
+        gene_centroid_resolution_heatmap.png
+    """
+    import logging
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    # -------------------------------------------------
+    # Load centroid table
+    # -------------------------------------------------
+    df = pd.read_csv(
+        Path(path_save, "resolution_centroids.tsv"),
+        sep="\t",
+    )
+
+    # -------------------------------------------------
+    # Parse gene and resolution from column names
+    # -------------------------------------------------
+    records = []
+
+    for col in df.columns:
+        # es: TP53-BRCA1_cluster2_0.6
+        left, _, res = col.rpartition("_")
+        gene_part = left.split("_cluster")[0]
+        genes = gene_part.split("-")
+
+        for g in genes:
+            records.append(
+                {
+                    "gene": g,
+                    "resolution": float(res),
+                    "count": 1,
+                }
+            )
+
+    long_df = pd.DataFrame(records)
+
+    # -------------------------------------------------
+    # Aggregate and normalize
+    # -------------------------------------------------
+    heatmap_df = (
+        long_df
+        .groupby(["gene", "resolution"])
+        .count()
+        .reset_index()
+        .pivot(index="gene", columns="resolution", values="count")
+        .fillna(0)
+    )
+
+    # normalize per gene
+    heatmap_norm = heatmap_df.div(
+        heatmap_df.max(axis=1),
+        axis=0,
+    )
+
+    # -------------------------------------------------
+    # Save TSV
+    # -------------------------------------------------
+    heatmap_norm.to_csv(
+        Path(path_save, "gene_centroid_resolution.tsv"),
+        sep="\t",
+    )
+
+    # -------------------------------------------------
+    # Plot heatmap
+    # -------------------------------------------------
+    plt.figure(figsize=(0.6 * heatmap_norm.shape[1] + 4,
+                        0.3 * heatmap_norm.shape[0] + 4))
+
+    sns.heatmap(
+        heatmap_norm,
+        cmap="viridis",
+        linewidths=0.5,
+        linecolor="grey",
+        cbar_kws={"label": "Normalized centroid frequency"},
+    )
+
+    plt.xlabel("Resolution")
+    plt.ylabel("Gene centroid")
+    plt.title("Gene-centroid stability across resolutions")
+
+    plt.tight_layout()
+    plt.savefig(
+        Path(path_save, "gene_centroid_resolution_heatmap.png"),
+        dpi=300,
+    )
+    plt.close()
+
+
+def cluster_centroid_resolution_heatmap(path_save):
+    """
+    Computes cluster-level centroid stability across resolutions
+    using Jaccard overlap with previous resolution.
+
+    Output:
+        cluster_centroid_resolution.tsv
+        cluster_centroid_resolution_heatmap.png
+    """
+
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    df = pd.read_csv(
+        Path(path_save, "resolution_centroids.tsv"),
+        sep="\t",
+    )
+
+    # ---------------------------------------
+    # Parse cluster -> resolution -> samples
+    # ---------------------------------------
+    cluster_map = {}
+
+    for col in df.columns:
+        # gene_clusterX_res
+        left, _, res = col.rpartition("_")
+        cluster_id = left.split("_cluster")[-1]
+        key = f"cluster{cluster_id}"
+
+        samples = set(df[col].dropna()) - {""}
+
+        cluster_map.setdefault(key, {})[float(res)] = samples
+
+    resolutions = sorted(
+        {float(c.rpartition("_")[2]) for c in df.columns}
+    )
+
+    # ---------------------------------------
+    # Jaccard overlap vs previous resolution
+    # ---------------------------------------
+    records = []
+
+    for cluster, res_map in cluster_map.items():
+        for i in range(1, len(resolutions)):
+            r1 = resolutions[i - 1]
+            r2 = resolutions[i]
+
+            if r1 in res_map and r2 in res_map:
+                s1 = res_map[r1]
+                s2 = res_map[r2]
+                j = len(s1 & s2) / len(s1 | s2) if s1 | s2 else 0
+            else:
+                j = 0
+
+            records.append(
+                {
+                    "cluster": cluster,
+                    "resolution": r2,
+                    "jaccard": j,
+                }
+            )
+
+    heat_df = (
+        pd.DataFrame(records)
+        .pivot(index="cluster", columns="resolution", values="jaccard")
+        .fillna(0)
+    )
+
+    heat_df.to_csv(
+        Path(path_save, "cluster_centroid_resolution.tsv"),
+        sep="\t",
+    )
+
+    # ---------------------------------------
+    # Plot
+    # ---------------------------------------
+    plt.figure(figsize=(0.6 * heat_df.shape[1] + 4,
+                        0.3 * heat_df.shape[0] + 4))
+
+    sns.heatmap(
+        heat_df,
+        cmap="magma",
+        linewidths=0.3,
+        cbar_kws={"label": "Jaccard overlap"},
+    )
+
+    plt.xlabel("Resolution")
+    plt.ylabel("Cluster centroid")
+    plt.title("Cluster-level centroid stability")
+
+    plt.tight_layout()
+    plt.savefig(
+        Path(path_save, "cluster_centroid_resolution_heatmap.png"),
+        dpi=300,
+    )
+    plt.close()
+
+
+def resolution_vs_centroid_gene_count(path_save):
+    """
+    Computes number of distinct centroid genes per resolution.
+
+    Output:
+        resolution_vs_centroid_genes.tsv
+        resolution_vs_centroid_genes.png
+    """
+
+    import matplotlib.pyplot as plt
+
+    df = pd.read_csv(
+        Path(path_save, "resolution_centroids.tsv"),
+        sep="\t",
+    )
+
+    res_gene_map = {}
+
+    for col in df.columns:
+        left, _, res = col.rpartition("_")
+        genes = left.split("_cluster")[0].split("-")
+
+        res_gene_map.setdefault(float(res), set()).update(genes)
+
+    out = pd.DataFrame(
+        {
+            "resolution": sorted(res_gene_map),
+            "n_centroid_genes": [
+                len(res_gene_map[r]) for r in sorted(res_gene_map)
+            ],
+        }
+    )
+
+    out.to_csv(
+        Path(path_save, "resolution_vs_centroid_genes.tsv"),
+        sep="\t",
+        index=False,
+    )
+
+    # Plot
+    plt.figure(figsize=(6, 4))
+    plt.plot(
+        out["resolution"],
+        out["n_centroid_genes"],
+        marker="o",
+    )
+    plt.xlabel("Resolution")
+    plt.ylabel("Number of centroid genes")
+    plt.title("Model complexity vs resolution")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(
+        Path(path_save, "resolution_vs_centroid_genes.png"),
+        dpi=300,
+    )
+    plt.close()
+
+def sankey_gene_centroid_flow(
+    path_save,
+    output_html="sankey_gene_centroid_flow.html",
+    min_flow=1,
+):
+    """
+    Build an interactive Sankey plot showing patient flow
+    across gene-centroid clusters from high to low resolution.
+
+    Nodes: GENE@RESOLUTION
+    Links: number of shared patients between centroid clusters
+           at consecutive resolutions.
+
+    Output:
+        sankey_gene_centroid_flow.html
+    """
+
+    import plotly.graph_objects as go
+    import random
+    import colorsys
+    def _gene_color_map(genes):
+        """
+        Assign a stable color to each gene.
+        """
+        colors = {}
+        for i, g in enumerate(sorted(genes)):
+            hue = i / max(1, len(genes))
+            rgb = colorsys.hsv_to_rgb(hue, 0.6, 0.85)
+            colors[g] = f"rgb({int(rgb[0]*255)}, {int(rgb[1]*255)}, {int(rgb[2]*255)})"
+        return colors
+
+
+
+    # --------------------------------------------------
+    # Load centroid table
+    # --------------------------------------------------
+    df = pd.read_csv(
+        Path(path_save, "resolution_centroids.tsv"),
+        sep="\t",
+    )
+
+    # --------------------------------------------------
+    # Parse clusters: resolution -> gene -> samples
+    # --------------------------------------------------
+    clusters = {}
+
+    for col in df.columns:
+        # Expected: gene_clusterX_res
+        left, _, res = col.rpartition("_")
+        gene_part = left.split("_cluster")[0]
+        res = float(res)
+
+        samples = set(
+            s
+            for s in df[col].dropna().astype(str)
+            if s != ""
+        )
+
+        clusters.setdefault(res, {}).setdefault(
+            gene_part, set()
+        ).update(samples)
+
+    # --------------------------------------------------
+    # Sort resolutions (HIGH -> LOW)
+    # --------------------------------------------------
+    resolutions = sorted(clusters.keys(), reverse=True)
+
+    # --------------------------------------------------
+    # Assign colors to genes (constant across resolutions)
+    # --------------------------------------------------
+    all_genes = set()
+    for res in clusters:
+        all_genes.update(clusters[res].keys())
+
+    gene_colors = _gene_color_map(all_genes)
+
+
+    # --------------------------------------------------
+    # Build nodes
+    # --------------------------------------------------
+    node_index = {}
+    node_labels = []
+    node_colors = []
+
+    def _add_node(label):
+        if label not in node_index:
+            gene = label.split("@")[0]
+            node_index[label] = len(node_labels)
+            node_labels.append(label)
+            node_colors.append(gene_colors.get(gene, "lightgrey"))
+
+
+    # --------------------------------------------------
+    # Build links
+    # --------------------------------------------------
+    sources = []
+    targets = []
+    values = []
+
+
+    for r1, r2 in zip(resolutions[:-1], resolutions[1:]):
+        for gene1, s1 in clusters[r1].items():
+            for gene2, s2 in clusters[r2].items():
+                overlap = len(s1 & s2)
+
+                if overlap >= min_flow:
+                    src = f"{gene1}@{r1}"
+                    tgt = f"{gene2}@{r2}"
+
+                    _add_node(src)
+                    _add_node(tgt)
+
+                    sources.append(node_index[src])
+                    targets.append(node_index[tgt])
+                    values.append(overlap)
+
+
+    # --------------------------------------------------
+    # Build Sankey plot
+    # --------------------------------------------------
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(
+                    pad=15,
+                    thickness=15,
+                    line=dict(color="black", width=0.5),
+                    label=node_labels,
+                    color=node_colors,
+                ),
+                link=dict(
+                    source=sources,
+                    target=targets,
+                    value=values,
+                    color="rgba(180,180,180,0.6)",
+                ),
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title_text="Patient flow across gene-centric clusters (multi-resolution)",
+        font_size=10,
+    )
+
+    # --------------------------------------------------
+    # Save HTML
+    # --------------------------------------------------
+    out_path = Path(path_save, output_html)
+    fig.write_html(out_path)
+
+    print(f"[DONE] Sankey plot saved to {out_path}")

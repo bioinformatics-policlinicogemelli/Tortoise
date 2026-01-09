@@ -102,6 +102,11 @@ def main(path_config: Path) -> None:
         libu.gene_centroid_stability(path_save)
         libu.centroid_overlap_matrix(path_save)
         libu.select_best_resolution(path_save)
+        libu.gene_centroid_resolution_heatmap(path_save)
+        libu.cluster_centroid_resolution_heatmap(path_save)
+        libu.resolution_vs_centroid_gene_count(path_save)
+        libu.sankey_gene_centroid_flow(path_save)
+
 
 
     except Exception as e:
