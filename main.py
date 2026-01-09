@@ -157,6 +157,12 @@ def filter_graph(cluster):
     )
     return g_ele
 
+def load_png_as_base64(png_path):
+    if not png_path.exists():
+        return None
+
+    encoded = base64.b64encode(png_path.read_bytes()).decode()
+    return f"data:image/png;base64,{encoded}"
 
 # APP + SIDEBAR
 APP = Dash(
@@ -2541,9 +2547,25 @@ def update_multi_fig(list_clusters: list, col_name: str):
 PAGE_RESOLUTION_OVERVIEW = html.Div(
     [
         html.H2("Resolution Analysis – Overview"),
-        html.P("Summary of multi-resolution clustering results."),
+
+        html.Hr(),
+
+        html.H4("Best resolution"),
+        html.Div(
+            id="best-resolution-text",
+            className="alert alert-info",
+        ),
+
+        html.Hr(),
+
+        html.H4("Model complexity vs resolution"),
+        html.Img(
+            id="resolution-gene-curve",
+            style={"maxWidth": "100%", "height": "auto"},
+        ),
     ]
 )
+
 
 PAGE_RESOLUTION_GENE = html.Div(
     [
@@ -2566,6 +2588,34 @@ PAGE_RESOLUTION_SANKEY = html.Div(
     ]
 )
 
+@callback(
+    Output("best-resolution-text", "children"),
+    Output("resolution-gene-curve", "src"),
+    Input("dd-study", "value"),
+)
+def update_resolution_overview(study_name):
+    if study_name is None or CONTEXT_DATA["out_root_path"] is None:
+        return "No study selected.", None
+
+    out_path = Path(CONTEXT_DATA["out_root_path"])
+
+    # -------------------------
+    # Best resolution
+    # -------------------------
+    best_res_file = out_path / "best_resolution.info"
+    if best_res_file.exists():
+        best_res = best_res_file.read_text().strip()
+        best_text = f"Selected best resolution: {best_res}"
+    else:
+        best_text = "Best resolution not available."
+
+    # -------------------------
+    # Resolution vs centroid genes plot
+    # -------------------------
+    curve_path = out_path / "resolution_vs_centroid_genes.png"
+    curve_img = load_png_as_base64(curve_path)
+
+    return best_text, curve_img
 
 
 # START
