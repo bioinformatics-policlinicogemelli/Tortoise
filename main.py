@@ -259,6 +259,48 @@ SIDEBAR = html.Div(
                     active="exact",
                     className="navbar_entity",
                 ),
+                # RESOLUTION ANALYSIS
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-project-diagram"),
+                        html.Span(" Resolution Analysis"),
+                    ],
+                    href="/resolution",
+                    active="exact",
+                ),
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-chart-line"),
+                        html.Span("  └ Overview"),
+                    ],
+                    href="/resolution/overview",
+                    className="ms-3",
+                ),
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-dna"),
+                        html.Span("  └ Gene Stability"),
+                    ],
+                    href="/resolution/gene-stability",
+                    className="ms-3",
+                ),
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-th-large"),
+                        html.Span("  └ Cluster Stability"),
+                    ],
+                    href="/resolution/cluster-stability",
+                    className="ms-3",
+                ),
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-random"),
+                        html.Span("  └ Sankey Flow"),
+                    ],
+                    href="/resolution/sankey",
+                    className="ms-3",
+                ),
+
             ],
             vertical=True,
             pills=True,
@@ -413,7 +455,26 @@ def redirect_pages(pathname):
         selected_page = PAGE_CLINICAL_DATA
     elif pathname == "/survival_analysis":
         selected_page = PAGE_SURVIVAL_ANALYSIS
+
+    elif pathname == "/resolution":
+        selected_page = PAGE_RESOLUTION_OVERVIEW
+
+    elif pathname == "/resolution/overview":
+        selected_page = PAGE_RESOLUTION_OVERVIEW
+
+    elif pathname == "/resolution/gene-stability":
+        selected_page = PAGE_RESOLUTION_GENE
+
+    elif pathname == "/resolution/cluster-stability":
+        selected_page = PAGE_RESOLUTION_CLUSTER
+
+    elif pathname == "/resolution/sankey":
+        selected_page = PAGE_RESOLUTION_SANKEY
+
+
+
     return selected_page
+
 
 
 @callback(
@@ -2476,6 +2537,35 @@ def update_multi_fig(list_clusters: list, col_name: str):
     CLUSTER_SELECTED_MULTI = list_clusters
     BOX_FIG_SELECTED_1 = col_name
     return func_multi_plot(list_clusters, col_name)
+
+PAGE_RESOLUTION_OVERVIEW = html.Div(
+    [
+        html.H2("Resolution Analysis – Overview"),
+        html.P("Summary of multi-resolution clustering results."),
+    ]
+)
+
+PAGE_RESOLUTION_GENE = html.Div(
+    [
+        html.H2("Gene Stability"),
+        html.P("Gene-centroid stability across resolutions."),
+    ]
+)
+
+PAGE_RESOLUTION_CLUSTER = html.Div(
+    [
+        html.H2("Cluster Stability"),
+        html.P("Cluster-level centroid stability across resolutions."),
+    ]
+)
+
+PAGE_RESOLUTION_SANKEY = html.Div(
+    [
+        html.H2("Sankey Flow"),
+        html.P("Patient flow across gene-centric clusters."),
+    ]
+)
+
 
 
 # START
