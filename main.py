@@ -1222,7 +1222,9 @@ def create_study(
     config_dict["paths"] = {}
     config_dict["clinical_data"] = {}
     config_dict["mutation"] = {}
+
     config_dict["name"] = input_namestudy
+
     config_dict["paths"]["data_mutational"] = str(
         Path(
             "study",
@@ -1233,27 +1235,48 @@ def create_study(
     )
     config_dict["paths"]["data_mutational_sep"] = "\t"
     config_dict["paths"]["data_mutational_skip"] = mutational_skiprow
+
     config_dict["paths"]["data_clinical_patient"] = ""
     config_dict["paths"]["data_clinical_sample_sep"] = "\t"
     config_dict["paths"]["data_clinical_sample_skip"] = 0
     config_dict["paths"]["data_clinical_sample"] = ""
     config_dict["paths"]["data_clinical_patient_sep"] = "\t"
     config_dict["paths"]["data_clinical_patient_skip"] = 0
+
     config_dict["mutation"]["column_gene"] = c_gene
     config_dict["mutation"]["column_sample_name"] = c_sample_mutation
     config_dict["seed_trials"] = seed_trials
     config_dict["clustering_resolution"] = clustering_resolution
-    # REMOVE EXTRA SEPARATOR BEFOR JOIN
+
+    # REMOVE EXTRA SEPARATOR BEFORE JOIN
     c_identifier_clean = [col.replace(";", "") for col in c_identifier]
-    config_dict["mutation"]["identifier_columns"] = ";".join(
-        c_identifier_clean,
-    )
+    config_dict["mutation"]["identifier_columns"] = ";".join(c_identifier_clean)
+
     config_dict["clinical_data"]["column_patient_name"] = ""
     config_dict["clinical_data"]["column_sample_name"] = ""
     config_dict["clinical_data"]["column_surv_event"] = ""
     config_dict["clinical_data"]["column_surv_time"] = ""
+
     config_dict["mutation"]["vaf_score"] = vaf_score
     config_dict["mutation"]["vaf_column"] = "" if c_vaf is None else c_vaf
+
+
+    # ============================================================
+    # NEW: SURVIVAL CONFIGURATION (OS / PFS) – STRUCTURE ONLY
+    # ============================================================
+
+    config_dict["survival"] = {
+        "os": {
+            "time_column": "",
+            "event_column": "",
+        },
+        "pfs": {
+            "time_column": "",
+            "event_column": "",
+        },
+    }
+
+
     if clinical_patient_filename is not None:
         config_dict["paths"]["data_clinical_patient"] = str(
             Path(
@@ -1263,13 +1286,14 @@ def create_study(
                 "clinical_patient.txt",
             ),
         )
-        config_dict["paths"]["data_clinical_patient_skip"] = (
-            clinical_patient_skiprow
-        )
+        config_dict["paths"]["data_clinical_patient_skip"] = clinical_patient_skiprow
         config_dict["clinical_data"]["column_patient_name"] = c_patient_name
+
         if c_surv_time and c_surv_event:
             config_dict["clinical_data"]["column_surv_event"] = c_surv_event
             config_dict["clinical_data"]["column_surv_time"] = c_surv_time
+
+
     if clinical_sample_filename is not None:
         config_dict["paths"]["data_clinical_sample"] = str(
             Path(
@@ -1279,16 +1303,17 @@ def create_study(
                 "clinical_sample.txt",
             ),
         )
-        config_dict["paths"]["data_clinical_sample_skip"] = (
-            clinical_sample_skiprow
-        )
+        config_dict["paths"]["data_clinical_sample_skip"] = clinical_sample_skiprow
         config_dict["clinical_data"]["column_sample_name"] = c_sample_name
+
+
     PATH_CONFIG = Path("study", input_namestudy, "config.json")
     with PATH_CONFIG.open("w", encoding="utf-8") as f:
         json.dump(config_dict, f, indent=4)
 
     READY_FOR_CREATION = True
     return True, dialog_message
+
 
 
 @callback(
