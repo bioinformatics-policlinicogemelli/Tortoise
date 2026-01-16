@@ -66,7 +66,7 @@ import random
 import sys
 from multiprocessing import Pool
 from pathlib import Path
-
+import re
 import igraph as ig
 import numpy as np
 import pandas as pd
@@ -189,7 +189,77 @@ def multi_resolution_clustering(
 
     print(f"[DONE] Resolution analysis saved to {out_file}")
 
+# =================================
+# NORMALIZATION DATA SURVIVAL EVENT
+# =================================
 
+def normalize_survival_event(series: pd.Series) -> pd.Series:
+    """
+    Normalize survival event column to:
+    - 1.0 = event occurred
+    - 0.0 = censored
+    - NaN = unknown / invalid
+
+    Handles:
+    - 1 / 0
+    - yes / no
+    - dead / alive
+    - progress / progressed / progression
+    - censored / censor
+    - compound values like '1:PROGRESS', '0:CENSORED'
+    - case-insensitive, punctuation-agnostic
+    """
+
+    if series is None:
+        return series
+
+    # keywords indicating event or censoring
+    event_values = {
+        "1", "yes", "y", "true",
+        "dead", "death", "deceased",
+        "progress", "progressed", "progression", "relapse", "event",
+    }
+
+    censored_values = {
+        "0", "no", "n", "false",
+        "alive", "censored", "censor",
+    }
+
+    def _normalize_value(val):
+        if pd.isna(val):
+            return np.nan
+
+        # numeric values
+        if isinstance(val, (int, float)):
+            if val == 1:
+                return 1.0
+            if val == 0:
+                return 0.0
+            return np.nan
+
+        # string normalization
+        s = str(val).strip().lower()
+
+        if not s:
+            return np.nan
+
+        # replace separators with spaces (":", ";", "-", etc.)
+        s = re.sub(r"[^\w]+", " ", s)
+
+        tokens = s.split()
+
+        # event if ANY token indicates event
+        if any(tok in event_values for tok in tokens):
+            return 1.0
+
+        # censored if ANY token indicates censoring
+        if any(tok in censored_values for tok in tokens):
+            return 0.0
+
+        return np.nan
+
+    return series.apply(_normalize_value)
+    
 
 def load_df(config):
     """Load dataframes from CSV files based on the provided configuration.
