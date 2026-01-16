@@ -259,7 +259,71 @@ def normalize_survival_event(series: pd.Series) -> pd.Series:
         return np.nan
 
     return series.apply(_normalize_value)
-    
+
+# ===========================
+# READ AND SET SURVIVAL EVENT
+# ===========================
+
+def prepare_survival_columns(df_clinical: pd.DataFrame, survival_cfg: dict):
+    """
+    Prepare canonical survival columns (OS / PFS) in clinical dataframe.
+
+    Returns
+    -------
+    df_clinical : pd.DataFrame
+        Updated dataframe with OS_TIME, OS_EVENT, PFS_TIME, PFS_EVENT (if available)
+    survival_info : dict
+        {
+            "os_available": bool,
+            "pfs_available": bool
+        }
+    """
+
+    df = df_clinical.copy()
+
+    survival_info = {
+        "os_available": False,
+        "pfs_available": False,
+    }
+
+    if not survival_cfg or not isinstance(survival_cfg, dict):
+        return df, survival_info
+
+    for endpoint in ("os", "pfs"):
+        cfg = survival_cfg.get(endpoint, {})
+        if not cfg:
+            continue
+
+        time_col = cfg.get("time_column")
+        event_col = cfg.get("event_column")
+
+        # Both columns must be defined and present
+        if (
+            not time_col
+            or not event_col
+            or time_col not in df.columns
+            or event_col not in df.columns
+        ):
+            continue
+
+        # Normalize TIME
+        time_series = pd.to_numeric(df[time_col], errors="coerce")
+
+        # Normalize EVENT
+        event_series = normalize_survival_event(df[event_col])
+
+        # At least 2 valid observations needed
+        valid_mask = time_series.notna() & event_series.notna()
+        if valid_mask.sum() < 2:
+            continue
+
+        # Create canonical columns
+        df[f"{endpoint.upper()}_TIME"] = time_series
+        df[f"{endpoint.upper()}_EVENT"] = event_series
+
+        survival_info[f"{endpoint}_available"] = True
+
+    return df, survival_info
 
 def load_df(config):
     """Load dataframes from CSV files based on the provided configuration.
