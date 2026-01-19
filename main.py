@@ -66,7 +66,7 @@ import io
 import json
 import os
 from pathlib import Path
-
+from lib.lib_utils import prepare_survival_columns
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
 import dash_uploader as du
@@ -521,9 +521,10 @@ def select_study(value) -> str:
     global BOX_FIG_SELECTED_2
 
     if value is None:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return (no_update,) * 8
+
     # prevent reload
-    if value == CONTEXT_DATA["name_study"]:
+    if value == CONTEXT_DATA.get("name_study"):
         return (
             f"Study {value}",
             f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
@@ -535,70 +536,127 @@ def select_study(value) -> str:
             f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
         )
 
-    # Load config
+    # --------------------------------------------------
+    # LOAD CONFIG
+    # --------------------------------------------------
     with Path("study", value, "config.json").open("r") as json_data:
-        d = json.load(json_data)
-        CONTEXT_DATA["config"] = d
+        CONTEXT_DATA["config"] = json.load(json_data)
+
+    # ==================================================
+    # COMMIT 5 — Legacy → survival.os migration
+    # ==================================================
+    cfg = CONTEXT_DATA["config"]
+
+    if "survival" not in cfg:
+        cfg["survival"] = {
+            "os": {"time_column": "", "event_column": ""},
+            "pfs": {"time_column": "", "event_column": ""},
+        }
+
+    os_cfg = cfg["survival"].get("os", {})
+    clinical_cfg = cfg.get("clinical_data", {})
+
+    if (
+        not os_cfg.get("time_column")
+        and not os_cfg.get("event_column")
+        and clinical_cfg.get("column_surv_time")
+        and clinical_cfg.get("column_surv_event")
+    ):
+        cfg["survival"]["os"]["time_column"] = clinical_cfg["column_surv_time"]
+        cfg["survival"]["os"]["event_column"] = clinical_cfg["column_surv_event"]
+
+        # persist migration
+        with Path("study", value, "config.json").open("w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=4)
 
     CONTEXT_DATA["name_study"] = value
-    CONTEXT_DATA["out_root_path"] = Path(
-        "study",
-        CONTEXT_DATA["name_study"],
-        "output",
-    )
+    CONTEXT_DATA["out_root_path"] = Path("study", value, "output")
+
+    # --------------------------------------------------
+    # LOAD GRAPH
+    # --------------------------------------------------
     GRAPH = np.load(
         CONTEXT_DATA["out_root_path"].joinpath("graph.npy"),
-        allow_pickle="TRUE",
+        allow_pickle=True,
     ).item()
 
-    CLUSTERS_INDEX = [int(c) for c in set(GRAPH.vs["cluster"])]
+    CLUSTERS_INDEX = sorted({int(c) for c in GRAPH.vs["cluster"]})
 
+    # --------------------------------------------------
+    # LOAD CLINICAL DATA
+    # --------------------------------------------------
     DF_CLINICAL_DATA = pd.read_csv(
         CONTEXT_DATA["out_root_path"].joinpath("cluster_clinical_data.csv"),
         sep="\t",
         engine="python",
     )
+
+    # --------------------------------------------------
+    # SURVIVAL NORMALIZATION
+    # --------------------------------------------------
+    from lib.lib_utils import prepare_survival_columns
+
+    CONTEXT_DATA["survival"] = {
+        "os_available": False,
+        "pfs_available": False,
+    }
+
+    survival_cfg = CONTEXT_DATA["config"].get("survival", {})
+
+    if survival_cfg:
+        try:
+            DF_CLINICAL_DATA, survival_info = prepare_survival_columns(
+                DF_CLINICAL_DATA,
+                survival_cfg,
+            )
+            CONTEXT_DATA["survival"].update(survival_info)
+        except Exception as e:
+            print("[WARNING] Survival preparation failed")
+            print(e)
+
+    # --------------------------------------------------
+    # ADD "ALL" CLUSTER
+    # --------------------------------------------------
     if len(DF_CLINICAL_DATA.columns) > 1:
-        df_clinical_data_all = DF_CLINICAL_DATA.copy()
-        df_clinical_data_all["cluster"] = "ALL"
-        DF_CLINICAL_DATA = pd.concat([DF_CLINICAL_DATA, df_clinical_data_all])
+        df_all = DF_CLINICAL_DATA.copy()
+        df_all["cluster"] = "ALL"
+        DF_CLINICAL_DATA = pd.concat([DF_CLINICAL_DATA, df_all])
+
         NUMERIC_COLUMNS_CLINICAL = list(
-            DF_CLINICAL_DATA.select_dtypes(include=np.number).columns,
+            DF_CLINICAL_DATA.select_dtypes(include=np.number).columns
         )
         ALL_COLUMNS_CLINICAL = list(DF_CLINICAL_DATA.columns)
         ALL_COLUMNS_CLINICAL.remove("cluster")
+
         BOX_FIG_SELECTED_1 = ALL_COLUMNS_CLINICAL[0]
         BOX_FIG_SELECTED_2 = ALL_COLUMNS_CLINICAL[-1]
-    column_vital_status = CONTEXT_DATA["config"]["clinical_data"]["column_surv_event"]
-    if column_vital_status != "":
-        DF_CLINICAL_DATA[column_vital_status+"_string"] = DF_CLINICAL_DATA[column_vital_status].map({1:"Yes",0:"No"})
-    # Reset selection
+
+    # --------------------------------------------------
+    # RESET SELECTIONS
+    # --------------------------------------------------
     CLUSTER_SELECTED = CLUSTERS_INDEX[0]
     CLUSTER_SELECTED_MULTI = ["ALL", CLUSTERS_INDEX[0]]
 
-    # STATS
+    # --------------------------------------------------
+    # LOAD STATS
+    # --------------------------------------------------
     stats = pd.read_csv(
         CONTEXT_DATA["out_root_path"].joinpath("numerosity_cluster.csv"),
         sep="\t",
         engine="python",
     )
+
     CONTEXT_DATA["stats"]["num_patient"] = stats["Patient"].sum()
     CONTEXT_DATA["stats"]["num_gene"] = stats["Gene"].sum()
     CONTEXT_DATA["stats"]["num_variant"] = stats["Variant"].sum()
     CONTEXT_DATA["stats"]["num_cluster"] = len(stats)
-    with (
-        CONTEXT_DATA["out_root_path"]
-        .joinpath("modularity.info")
-        .open("r") as f
-    ):
-        CONTEXT_DATA["stats"]["modularity"] = f.readline()
-    with (
-        CONTEXT_DATA["out_root_path"]
-        .joinpath("seed.info")
-        .open("r") as f
-    ):
-        CONTEXT_DATA["stats"]["seed"] = f.readline()
-      
+
+    with CONTEXT_DATA["out_root_path"].joinpath("modularity.info").open() as f:
+        CONTEXT_DATA["stats"]["modularity"] = f.readline().strip()
+
+    with CONTEXT_DATA["out_root_path"].joinpath("seed.info").open() as f:
+        CONTEXT_DATA["stats"]["seed"] = f.readline().strip()
+
     return (
         f"Study {value}",
         f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
@@ -609,6 +667,7 @@ def select_study(value) -> str:
         f"Seed: {CONTEXT_DATA['stats']['seed']}",
         f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
     )
+
 
 
 # CREATE STUDY

@@ -268,6 +268,9 @@ def prepare_survival_columns(df_clinical: pd.DataFrame, survival_cfg: dict):
     """
     Prepare canonical survival columns (OS / PFS) in clinical dataframe.
 
+    Uses ONLY explicit configuration from config.json.
+    No column name inference is performed.
+
     Returns
     -------
     df_clinical : pd.DataFrame
@@ -286,7 +289,7 @@ def prepare_survival_columns(df_clinical: pd.DataFrame, survival_cfg: dict):
         "pfs_available": False,
     }
 
-    if not survival_cfg or not isinstance(survival_cfg, dict):
+    if not isinstance(survival_cfg, dict):
         return df, survival_info
 
     for endpoint in ("os", "pfs"):
@@ -297,7 +300,7 @@ def prepare_survival_columns(df_clinical: pd.DataFrame, survival_cfg: dict):
         time_col = cfg.get("time_column")
         event_col = cfg.get("event_column")
 
-        # Both columns must be defined and present
+        # Both columns must be explicitly defined and present
         if (
             not time_col
             or not event_col
@@ -306,21 +309,15 @@ def prepare_survival_columns(df_clinical: pd.DataFrame, survival_cfg: dict):
         ):
             continue
 
-        # Normalize TIME
         time_series = pd.to_numeric(df[time_col], errors="coerce")
-
-        # Normalize EVENT
         event_series = normalize_survival_event(df[event_col])
 
-        # At least 2 valid observations needed
         valid_mask = time_series.notna() & event_series.notna()
         if valid_mask.sum() < 2:
             continue
 
-        # Create canonical columns
         df[f"{endpoint.upper()}_TIME"] = time_series
         df[f"{endpoint.upper()}_EVENT"] = event_series
-
         survival_info[f"{endpoint}_available"] = True
 
     return df, survival_info
