@@ -674,457 +674,333 @@ def select_study(value) -> str:
 PAGE_CREATE_STUDY = [
     dcc.ConfirmDialog(id="confirm-study", message="..."),
     dbc.Row([html.H2("Study Configuration")]),
+
+    # ============================================================
     # NAME STUDY
+    # ============================================================
     dbc.Row(
         [
+            dbc.Col([html.H5("Name Study:")], width=2),
             dbc.Col(
-                [
-                    html.H5("Name Study:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Input(
-                        id="input_namestudy",
-                        type="text",
-                        placeholder="Name study",
-                        style={"width": "100%"},
-                    ),
-                ],
+                [dcc.Input(id="input_namestudy", type="text", style={"width": "100%"})],
                 width=3,
             ),
         ],
     ),
+
+    # ============================================================
     # SEED TRIALS
+    # ============================================================
     dbc.Row(
         [
-            dbc.Col(
-                [
-                    html.H5("Seed trials:"),
-                ],
-                width=2,
-            ),
+            dbc.Col([html.H5("Seed trials:")], width=2),
             dbc.Col(
                 [
                     dcc.Dropdown(
                         [5_000, 10_000, 25_000, 50_000, 100_000, 500_000],
-                        placeholder=10_000,
                         id="seed-trials",
-                        style={"width": "100%"},
-                    ),
+                        value=10_000,  # FIX (coerente col backend)
+                    )
                 ],
                 width=3,
             ),
         ],
     ),
+
+    # ============================================================
     # CLUSTERING RESOLUTION
+    # ============================================================
     dbc.Row(
         [
-            dbc.Col(
-                [
-                    html.H5("Clustering resolution:"),
-                ],
-                width=2,
-            ),
+            dbc.Col([html.H5("Clustering resolution:")], width=2),
             dbc.Col(
                 [
                     dcc.Input(
                         id="clustering-resolution",
                         type="number",
-                        placeholder="1.0",
                         min=0.01,
                         max=2.0,
                         step=0.01,
-                        style={"width": "100%"},
-                    ),
+                        value=1.0,  # FIX (coerente col backend)
+                    )
                 ],
                 width=3,
             ),
         ],
     ),
-    # DATA MUTATIONAL
+
+    html.Hr(),
+
+    # ============================================================
+    # MUTATIONAL DATA (UNCHANGED)
+    # ============================================================
     dbc.Row(
         [
+            dbc.Col([html.H5("File Data Mutational:")], width=2),
+            dbc.Col([du.Upload(id="mutational-file")], width=3),
+            dbc.Col([dcc.Dropdown(["\\t", ",", ";"], id="mutational-separator")], width=2),
+            dbc.Col([dcc.Input(id="mutational-skiprow", type="number")], width=2),
+        ],
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col([html.H5("Column Sample Name:")], width=2),
+            dbc.Col([dcc.Dropdown(id="dd-column-sample-name-mutation")], width=3),
+        ],
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col([html.H5("Column Gene:")], width=2),
+            dbc.Col([dcc.Dropdown(id="dd-column-gene")], width=3),
+        ],
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col([html.H5("Identifier Columns:")], width=2),
+            dbc.Col([dcc.Dropdown(id="dd-identifier-columns", multi=True)], width=3),
+        ],
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col([html.H5("Column VAF:")], width=2),
+            dbc.Col([dcc.Dropdown(id="dd-vaf")], width=3),
+        ],
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col([html.H5("VAF Score:")], width=2),
+            dbc.Col([dcc.Input(id="input-vaf-score", type="number")], width=3),
+        ],
+    ),
+
+    html.Hr(),
+
+    # ============================================================
+    # CLINICAL PATIENT (UNCHANGED)
+    # ============================================================
+    dbc.Row(
+        [
+            dbc.Col([html.H5("File Clinical Patient:")], width=2),
+            dbc.Col([du.Upload(id="clinical-patient-file")], width=3),
+            dbc.Col([dcc.Dropdown(["\\t", ",", ";"], id="clinical-patient-separator")], width=2),
+            dbc.Col([dcc.Input(id="clinical-patient-skiprow", type="number")], width=2),
+        ],
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col([html.H5("Column Patient Name:")], width=2),
+            dbc.Col([dcc.Dropdown(id="dd-column-patient-name")], width=3),
+        ],
+    ),
+
+    html.Hr(),
+
+    # ============================================================
+    # SURVIVAL AVAILABILITY (UNCHANGED)
+    # ============================================================
+    dbc.Row(
+        [
+            dbc.Col([html.H5("Survival data available:")], width=2),
             dbc.Col(
                 [
-                    html.H5("File Data Mutational:"),
+                    dcc.RadioItems(
+                        id="radio-survival-availability",
+                        options=[
+                            {"label": "No survival data", "value": "none"},
+                            {"label": "Overall Survival (OS)", "value": "os"},
+                            {"label": "Overall Survival + PFS", "value": "os_pfs"},
+                        ],
+                        value="none",
+                    )
                 ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    du.Upload(
-                        id="mutational-file",
-                        text="Upload Mutational File",
-                        chunk_size=100,
-                    ),
-                ],
-                width=3,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        ["\\t", ",", ";"],
-                        placeholder="Select separator",
-                        id="mutational-separator",
-                    ),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Input(
-                        id="mutational-skiprow",
-                        type="number",
-                        placeholder="Skiprows",
-                        min=0,
-                    ),
-                ],
-                width=2,
+                width=6,
             ),
         ],
     ),
-    # COLUMN SAMPLE NAME
-    dbc.Row(
-        [
-            dbc.Col(
+
+    html.Hr(),
+
+    # ============================================================
+    # OS SURVIVAL (UNCHANGED IDS)
+    # ============================================================
+    html.Div(
+        id="os-survival-block",
+        children=[
+            html.H5("Overall Survival (OS)"),
+            dbc.Row(
                 [
-                    html.H5("Column Sample Name:"),
-                ],
-                width=2,
+                    dbc.Col([html.H5("OS Event Column:")], width=2),
+                    dbc.Col([dcc.Dropdown(id="dd-column-survival-event")], width=3),
+                ]
             ),
-            dbc.Col(
+            dbc.Row(
                 [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-column-sample-name-mutation",
-                    ),
-                ],
-                width=3,
+                    dbc.Col([html.H5("OS Time Column:")], width=2),
+                    dbc.Col([dcc.Dropdown(id="dd-column-survival-time")], width=3),
+                ]
             ),
         ],
     ),
-    # COLUMN GENE NAME
-    dbc.Row(
-        [
-            dbc.Col(
+
+    html.Hr(),
+
+    # ============================================================
+    # PFS SURVIVAL (UNCHANGED IDS)
+    # ============================================================
+    html.Div(
+        id="pfs-survival-block",
+        children=[
+            html.H5("Progression-Free Survival (PFS)"),
+            dbc.Row(
                 [
-                    html.H5("Column Gene:"),
-                ],
-                width=2,
+                    dbc.Col([html.H5("PFS Event Column:")], width=2),
+                    dbc.Col([dcc.Dropdown(id="dd-pfs-survival-event")], width=3),
+                ]
             ),
-            dbc.Col(
+            dbc.Row(
                 [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-column-gene",
-                    ),
-                ],
-                width=3,
+                    dbc.Col([html.H5("PFS Time Column:")], width=2),
+                    dbc.Col([dcc.Dropdown(id="dd-pfs-survival-time")], width=3),
+                ]
             ),
         ],
     ),
-    # IDENTIFIER COLUMNS
+
+    html.Hr(),
+
+    # ============================================================
+    # CLINICAL SAMPLE 
+    # ============================================================
     dbc.Row(
         [
-            dbc.Col(
-                [
-                    html.H5("Identifier Columns:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-identifier-columns",
-                        multi=True,
-                    ),
-                ],
-                width=3,
-            ),
+            dbc.Col([html.H5("File Clinical Sample:")], width=2),
+            dbc.Col([du.Upload(id="clinical-sample-file")], width=3),
+            dbc.Col([dcc.Dropdown(["\\t", ",", ";"], id="clinical-sample-separator")], width=2),
+            dbc.Col([dcc.Input(id="clinical-sample-skiprow", type="number")], width=2),
         ],
     ),
-    # COLUMN VAF
+
     dbc.Row(
         [
-            dbc.Col(
-                [
-                    html.H5("Column VAF:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-vaf",
-                    ),
-                ],
-                width=3,
-            ),
+            dbc.Col([html.H5("Column Sample Name:")], width=2),
+            dbc.Col([dcc.Dropdown(id="dd-column-sample-name")], width=3),
         ],
     ),
-    # COLUMN VAF SCORE
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("VAF Score:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Input(
-                        id="input-vaf-score",
-                        type="number",
-                        placeholder="VAF Score",
-                        min=0,
-                        max=1,
-                        step=0.01,
-                        style={"width": "100%"},
-                    ),
-                ],
-                width=3,
-            ),
-        ],
-    ),
-    # CLINICAL PATIENT
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("File Clinical Patient:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    du.Upload(
-                        id="clinical-patient-file",
-                        text="Upload Clinical Patient File",
-                        chunk_size=100,
-                    ),
-                ],
-                width=3,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        ["\\t", ",", ";"],
-                        placeholder="Select separator",
-                        id="clinical-patient-separator",
-                    ),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Input(
-                        id="clinical-patient-skiprow",
-                        type="number",
-                        placeholder="Skiprows",
-                        min=0,
-                    ),
-                ],
-                width=2,
-            ),
-        ],
-    ),
-    # COLUMN PATIENT NAME
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("Column Patient Name:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-column-patient-name",
-                    ),
-                ],
-                width=3,
-            ),
-        ],
-    ),
-    # COLUMN SURVIVAL EVENT
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("Column Survival Event:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-column-survival-event",
-                    ),
-                ],
-                width=3,
-            ),
-        ],
-    ),
-    # COLUMN SURVIVAL TIME
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("Column Survival Time:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-column-survival-time",
-                    ),
-                ],
-                width=3,
-            ),
-        ],
-    ),
-    # CLINICAL SAMPLE
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("File Clinical Sample:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    du.Upload(
-                        id="clinical-sample-file",
-                        text="Upload Clinical Sample File",
-                        chunk_size=100,
-                    ),
-                ],
-                width=3,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        ["\\t", ",", ";"],
-                        placeholder="Select separator",
-                        id="clinical-sample-separator",
-                    ),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Input(
-                        id="clinical-sample-skiprow",
-                        type="number",
-                        placeholder="Skiprows",
-                        min=0,
-                    ),
-                ],
-                width=2,
-            ),
-        ],
-    ),
-    # COLUMN SAMPLE NAME
-    dbc.Row(
-        [
-            dbc.Col(
-                [
-                    html.H5("Column Sample Name:"),
-                ],
-                width=2,
-            ),
-            dbc.Col(
-                [
-                    dcc.Dropdown(
-                        options=[],
-                        id="dd-column-sample-name",
-                    ),
-                ],
-                width=3,
-            ),
-        ],
-    ),
-    # CREATE STUDY BUTTON
-    dbc.Row(
-        [
-            html.Button("Create Study", id="create-study-button", n_clicks=0),
-        ],
-    ),
-    # LOADING
-    dbc.Row(
-        [
-            dcc.Loading(
-                children=[
-                    html.Span(
-                        id="create-study-log",
-                        className="create_study_log",
-                    ),
-                ],
-            ),
-        ],
-    ),
+
+    html.Hr(),
+
+    dbc.Row([html.Button("Create Study", id="create-study-button")]),
+    dbc.Row([dcc.Loading(children=[html.Span(id="create-study-log")])]),
 ]
 
 
-# dropdown column patient name
+
+
+
+# ============================================================
+# SURVIVAL VISIBILITY CONTROLLER (OS / PFS)
+# ============================================================
+@callback(
+    Output("os-survival-block", "style"),
+    Output("pfs-survival-block", "style"),
+    Input("radio-survival-availability", "value"),
+)
+def toggle_survival_blocks(selection):
+    """
+    Controls visibility of OS / PFS blocks during study creation.
+
+    selection:
+        - "none"
+        - "os"
+        - "os_pfs"
+    """
+
+    hidden = {"display": "none"}
+    visible = {"display": "block"}
+
+    if selection == "os":
+        return visible, hidden
+
+    if selection == "os_pfs":
+        return visible, visible
+
+    # default / "none"
+    return hidden, hidden
+
 @callback(
     Output("dd-column-patient-name", "options"),
     Output("dd-column-survival-event", "options"),
     Output("dd-column-survival-time", "options"),
-    [
-        Input("clinical-patient-file", "isCompleted"),
-        State("clinical-patient-file", "fileNames"),
-        Input("clinical-patient-separator", "value"),
-        Input("clinical-patient-skiprow", "value"),
-    ],
-    prevent_initial_call=True,
+    Input("clinical-patient-file", "isCompleted"),
+    Input("clinical-patient-separator", "value"),
+    Input("clinical-patient-skiprow", "value"),
+    State("clinical-patient-file", "fileNames"),
 )
-def update_list_columns_patient_name(loaded, filename, sep, skip):
-    if not loaded or sep is None or skip is None:
+def update_list_columns_patient_name(loaded, sep, skip, filename):
+    if not loaded or sep is None or skip is None or not filename:
         return [], [], []
-    df_patient = pd.read_csv(
+
+    df = pd.read_csv(
         Path("temp", filename[0]),
         sep=sep,
         skiprows=skip,
         engine="python",
         nrows=0,
     )
-    return df_patient.columns, df_patient.columns, df_patient.columns
 
+    cols = df.columns.tolist()
+    return cols, cols, cols
+
+@callback(
+    Output("dd-pfs-survival-event", "options"),
+    Output("dd-pfs-survival-time", "options"),
+    Input("clinical-patient-file", "isCompleted"),
+    Input("clinical-patient-separator", "value"),
+    Input("clinical-patient-skiprow", "value"),
+    State("clinical-patient-file", "fileNames"),
+)
+def populate_pfs_columns(loaded, sep, skip, filename):
+    if not loaded or sep is None or skip is None or not filename:
+        return [], []
+
+    df = pd.read_csv(
+        Path("temp", filename[0]),
+        sep=sep,
+        skiprows=skip,
+        engine="python",
+        nrows=0,
+    )
+
+    cols = df.columns.tolist()
+    return cols, cols
 
 # dropdown column sample name
 @callback(
     Output("dd-column-sample-name", "options"),
-    [
-        Input("clinical-sample-file", "isCompleted"),
-        State("clinical-sample-file", "fileNames"),
-        Input("clinical-sample-separator", "value"),
-        Input("clinical-sample-skiprow", "value"),
-    ],
-    prevent_initial_call=True,
+    Input("clinical-sample-file", "isCompleted"),
+    Input("clinical-sample-separator", "value"),
+    Input("clinical-sample-skiprow", "value"),
+    State("clinical-sample-file", "fileNames"),
 )
-def update_list_columns_sample_name(loaded, filename, sep, skip):
-    if not loaded or sep is None or skip is None:
+def update_list_columns_sample_name(loaded, sep, skip, filename):
+    if not loaded or sep is None or skip is None or not filename:
         return []
-    df_sample = pd.read_csv(
+
+    df = pd.read_csv(
         Path("temp", filename[0]),
         sep=sep,
         skiprows=skip,
         engine="python",
         nrows=0,
     )
-    return df_sample.columns
+    return df.columns.tolist()
+
 
 
 # dropdown mutation
@@ -1158,50 +1034,76 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     Output("confirm-study", "displayed"),
     Output("confirm-study", "message"),
     Input("create-study-button", "n_clicks"),
+
     State("input_namestudy", "value"),
+
     State("mutational-file", "fileNames"),
     State("mutational-separator", "value"),
     State("mutational-skiprow", "value"),
+
     State("clinical-patient-file", "fileNames"),
     State("clinical-patient-separator", "value"),
     State("clinical-patient-skiprow", "value"),
+
     State("clinical-sample-file", "fileNames"),
     State("clinical-sample-separator", "value"),
     State("clinical-sample-skiprow", "value"),
+
     State("dd-column-patient-name", "value"),
+
+    # -------- OS (già esistenti)
     State("dd-column-survival-event", "value"),
     State("dd-column-survival-time", "value"),
+
+    # -------- PFS (NUOVI – FIX)
+    State("dd-pfs-survival-event", "value"),
+    State("dd-pfs-survival-time", "value"),
+
     State("dd-column-sample-name", "value"),
     State("dd-column-sample-name-mutation", "value"),
     State("dd-column-gene", "value"),
     State("dd-identifier-columns", "value"),
     State("dd-vaf", "value"),
     State("input-vaf-score", "value"),
+
     State("seed-trials", "value"),
     State("clustering-resolution", "value"),
+
     prevent_initial_call=True,
 )
 def create_study(
     _,
     input_namestudy,
+
     mutational_filename,
     mutational_separator,
     mutational_skiprow,
+
     clinical_patient_filename,
     clinical_patient_separator,
     clinical_patient_skiprow,
+
     clinical_sample_filename,
     clinical_sample_separator,
     clinical_sample_skiprow,
+
     c_patient_name,
+
+    # OS
     c_surv_event,
     c_surv_time,
+
+    # PFS
+    c_pfs_event,
+    c_pfs_time,
+
     c_sample_name,
     c_sample_mutation,
     c_gene,
     c_identifier,
     c_vaf,
     vaf_score,
+
     seed_trials,
     clustering_resolution,
 ):
@@ -1210,30 +1112,36 @@ def create_study(
     global READY_FOR_CREATION
 
     READY_FOR_CREATION = False
+
+    # ============================================================
     # CHECK INPUT DATA
+    # ============================================================
     if input_namestudy is None:
         return True, "Please insert name for study"
+
     CONTEXT_DATA["name_study_input"] = input_namestudy
+
     if Path("study", input_namestudy, "input").exists():
         return True, "Name study already exist"
+
     if mutational_filename is None:
         return True, "Please insert file for mutational data"
+
     if mutational_separator is None:
         return True, "Please select separator for mutational data"
+
     if mutational_skiprow is None:
         return True, "Please select skiprow for mutational data"
+
     if c_gene is None:
         return True, "Please select column for gene"
+
     if c_sample_mutation is None:
-        return (
-            True,
-            "Please select column for sample name on mutation file",
-        )
+        return True, "Please select column for sample name on mutation file"
+
     if c_identifier == []:
-        return (
-            True,
-            "Please select at least one column for mutation identifier",
-        )
+        return True, "Please select at least one column for mutation identifier"
+
     if clinical_patient_filename is not None:
         if clinical_patient_separator is None:
             return True, "Please select separator for clinical patient data"
@@ -1241,101 +1149,90 @@ def create_study(
             return True, "Please select skiprow for clinical patient data"
         if c_patient_name is None:
             return True, "Please select column for patient name"
-        if (c_surv_event is None and c_surv_time is not None) or (
-            c_surv_event is not None and c_surv_time is None
-        ):
-            return True, "Please select survival envent and survival time"
+        if (c_surv_event is None) != (c_surv_time is None):
+            return True, "Please select survival event and survival time"
+
     if clinical_sample_filename is not None:
         if clinical_sample_separator is None:
             return True, "Please select separator for clinical sample data"
         if clinical_sample_skiprow is None:
             return True, "Please select skiprow for clinical sample data"
         if c_sample_name is None:
-            return (
-                True,
-                "Please select column for sample name on clinical sample file",
-            )
+            return True, "Please select column for sample name on clinical sample file"
+
     if seed_trials is None:
         seed_trials = 10_000
+
     if clustering_resolution is None:
         clustering_resolution = 1.0
+
+    # ============================================================
     # CREATE STUDY FOLDER
+    # ============================================================
     Path("study", input_namestudy, "input").mkdir(parents=True, exist_ok=True)
-    # MUTATIONAL DATA
+
     Path("temp", mutational_filename[0]).rename(
-        Path("study", input_namestudy, "input", "mutational_data.txt"),
+        Path("study", input_namestudy, "input", "mutational_data.txt")
     )
+
     dialog_message = f"Create study '{input_namestudy}'?"
-    # CLINICAL PATIENT
+
     if clinical_patient_filename is not None:
         Path("temp", clinical_patient_filename[0]).rename(
-            Path("study", input_namestudy, "input", "clinical_patient.txt"),
+            Path("study", input_namestudy, "input", "clinical_patient.txt")
         )
-    # CLINICAL SAMPLE
+
     if clinical_sample_filename is not None:
         Path("temp", clinical_sample_filename[0]).rename(
-            Path("study", input_namestudy, "input", "clinical_sample.txt"),
+            Path("study", input_namestudy, "input", "clinical_sample.txt")
         )
-    # GENERATE JSON CONFIG
-    config_dict = {}
-    config_dict["paths"] = {}
-    config_dict["clinical_data"] = {}
-    config_dict["mutation"] = {}
 
-    config_dict["name"] = input_namestudy
+    # ============================================================
+    # GENERATE JSON CONFIG
+    # ============================================================
+    config_dict = {
+        "name": input_namestudy,
+        "paths": {},
+        "clinical_data": {},
+        "mutation": {},
+        "seed_trials": seed_trials,
+        "clustering_resolution": clustering_resolution,
+        "survival": {
+            "os": {"time_column": "", "event_column": ""},
+            "pfs": {"time_column": "", "event_column": ""},
+        },
+    }
 
     config_dict["paths"]["data_mutational"] = str(
-        Path(
-            "study",
-            input_namestudy,
-            "input",
-            "mutational_data.txt",
-        ),
+        Path("study", input_namestudy, "input", "mutational_data.txt")
     )
     config_dict["paths"]["data_mutational_sep"] = "\t"
     config_dict["paths"]["data_mutational_skip"] = mutational_skiprow
 
     config_dict["paths"]["data_clinical_patient"] = ""
-    config_dict["paths"]["data_clinical_sample_sep"] = "\t"
-    config_dict["paths"]["data_clinical_sample_skip"] = 0
-    config_dict["paths"]["data_clinical_sample"] = ""
     config_dict["paths"]["data_clinical_patient_sep"] = "\t"
     config_dict["paths"]["data_clinical_patient_skip"] = 0
 
+    config_dict["paths"]["data_clinical_sample"] = ""
+    config_dict["paths"]["data_clinical_sample_sep"] = "\t"
+    config_dict["paths"]["data_clinical_sample_skip"] = 0
+
     config_dict["mutation"]["column_gene"] = c_gene
     config_dict["mutation"]["column_sample_name"] = c_sample_mutation
-    config_dict["seed_trials"] = seed_trials
-    config_dict["clustering_resolution"] = clustering_resolution
-
-    # REMOVE EXTRA SEPARATOR BEFORE JOIN
-    c_identifier_clean = [col.replace(";", "") for col in c_identifier]
-    config_dict["mutation"]["identifier_columns"] = ";".join(c_identifier_clean)
+    config_dict["mutation"]["identifier_columns"] = ";".join(
+        [col.replace(";", "") for col in c_identifier]
+    )
+    config_dict["mutation"]["vaf_score"] = vaf_score
+    config_dict["mutation"]["vaf_column"] = "" if c_vaf is None else c_vaf
 
     config_dict["clinical_data"]["column_patient_name"] = ""
     config_dict["clinical_data"]["column_sample_name"] = ""
     config_dict["clinical_data"]["column_surv_event"] = ""
     config_dict["clinical_data"]["column_surv_time"] = ""
 
-    config_dict["mutation"]["vaf_score"] = vaf_score
-    config_dict["mutation"]["vaf_column"] = "" if c_vaf is None else c_vaf
-
-
     # ============================================================
-    # NEW: SURVIVAL CONFIGURATION (OS / PFS) – STRUCTURE ONLY
+    # CLINICAL PATIENT + SURVIVAL
     # ============================================================
-
-    config_dict["survival"] = {
-        "os": {
-            "time_column": "",
-            "event_column": "",
-        },
-        "pfs": {
-            "time_column": "",
-            "event_column": "",
-        },
-    }
-
-
     if clinical_patient_filename is not None:
         config_dict["paths"]["data_clinical_patient"] = str(
             Path("study", input_namestudy, "input", "clinical_patient.txt")
@@ -1343,32 +1240,27 @@ def create_study(
         config_dict["paths"]["data_clinical_patient_skip"] = clinical_patient_skiprow
         config_dict["clinical_data"]["column_patient_name"] = c_patient_name
 
-        # --------------------------------------------
-        # Survival (legacy input → OS by definition)
-        # --------------------------------------------
+        # OS
         if c_surv_time and c_surv_event:
-            # legacy (kept for backward compatibility)
             config_dict["clinical_data"]["column_surv_event"] = c_surv_event
             config_dict["clinical_data"]["column_surv_time"] = c_surv_time
-
-            # canonical survival config
             config_dict["survival"]["os"]["time_column"] = c_surv_time
             config_dict["survival"]["os"]["event_column"] = c_surv_event
 
+        # PFS FIX
+        if c_pfs_time and c_pfs_event:
+            config_dict["survival"]["pfs"]["time_column"] = c_pfs_time
+            config_dict["survival"]["pfs"]["event_column"] = c_pfs_event
 
-
+    # ============================================================
+    # CLINICAL SAMPLE
+    # ============================================================
     if clinical_sample_filename is not None:
         config_dict["paths"]["data_clinical_sample"] = str(
-            Path(
-                "study",
-                input_namestudy,
-                "input",
-                "clinical_sample.txt",
-            ),
+            Path("study", input_namestudy, "input", "clinical_sample.txt")
         )
         config_dict["paths"]["data_clinical_sample_skip"] = clinical_sample_skiprow
         config_dict["clinical_data"]["column_sample_name"] = c_sample_name
-
 
     PATH_CONFIG = Path("study", input_namestudy, "config.json")
     with PATH_CONFIG.open("w", encoding="utf-8") as f:
@@ -1376,6 +1268,7 @@ def create_study(
 
     READY_FOR_CREATION = True
     return True, dialog_message
+
 
 
 
