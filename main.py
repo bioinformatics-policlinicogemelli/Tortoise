@@ -1338,19 +1338,23 @@ def create_study(
 
     if clinical_patient_filename is not None:
         config_dict["paths"]["data_clinical_patient"] = str(
-            Path(
-                "study",
-                input_namestudy,
-                "input",
-                "clinical_patient.txt",
-            ),
+            Path("study", input_namestudy, "input", "clinical_patient.txt")
         )
         config_dict["paths"]["data_clinical_patient_skip"] = clinical_patient_skiprow
         config_dict["clinical_data"]["column_patient_name"] = c_patient_name
 
+        # --------------------------------------------
+        # Survival (legacy input → OS by definition)
+        # --------------------------------------------
         if c_surv_time and c_surv_event:
+            # legacy (kept for backward compatibility)
             config_dict["clinical_data"]["column_surv_event"] = c_surv_event
             config_dict["clinical_data"]["column_surv_time"] = c_surv_time
+
+            # canonical survival config
+            config_dict["survival"]["os"]["time_column"] = c_surv_time
+            config_dict["survival"]["os"]["event_column"] = c_surv_event
+
 
 
     if clinical_sample_filename is not None:
