@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Module taht creates graphs and performs clustering and enrichment analysis.
+"""Module that creates graphs and performs clustering and enrichment analysis.
 
 Functions:
     load_df(config): Loads mutational and clinical data from CSV files.
@@ -55,7 +55,7 @@ def main(path_config: Path) -> None:
     Path(path_save).mkdir(parents=True, exist_ok=True)
     # load df
     logger.info(" 10% -- Load files")
-    df_mut, data_clinical_sample, data_clinical_patient = libu.load_df(config)
+    df_mut, data_clinical_sample, data_clinical_patient, data_cnv = libu.load_df(config)
     # create maps and graph
     logger.info(" 20% -- Add category mutations")
     if len(identifier_columns) > 1:
@@ -75,6 +75,13 @@ def main(path_config: Path) -> None:
         config["mutation"]["vaf_score"],
         config["mutation"]["vaf_column"],
     )
+    # insert CNV data
+    logger.info(" 37% -- Add CNV data to maps")
+    if data_cnv is not None:
+        d_cnv = libu.preprocess_cnv(data_cnv, config["cnv"].get("column_cnv_identifier"))
+        map_patients, map_variants = libu.add_cnv_to_maps(
+            d_cnv, map_patients, map_variants
+        )
     # cluster
     logger.info(" 40% -- Create graph")
     g = libu.graph_creation(map_patients, map_variants)

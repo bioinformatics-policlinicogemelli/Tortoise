@@ -94,6 +94,7 @@ from plotly.subplots import make_subplots
 from rpy2.robjects import conversion, default_converter
 
 from lib import venn
+from lib import lib_utils as libu
 
 # Config lib
 mpl.use("agg")
@@ -1090,6 +1091,37 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     return df_mut.columns, df_mut.columns, df_mut.columns, df_mut.columns
 
 
+# dropdown CNV columns
+@callback(
+    Output("dd-column-cnv-identifier", "options"),
+    [
+        Input("cnv-file", "isCompleted"),
+        State("cnv-file", "fileNames"),
+        Input("cnv-separator", "value"),
+        Input("cnv-skiprow", "value"),
+    ],
+    prevent_initial_call=True,
+)
+def update_list_columns_cnv(loaded, filename, sep, skip):
+    if not loaded or filename is None or len(filename) == 0:
+        return []
+    if sep is None or skip is None:
+        sep = "\t"
+        skip = 0
+    try:
+        df_cnv = pd.read_csv(
+            Path("temp", filename[0]),
+            sep=sep,
+            skiprows=skip,
+            engine="python",
+            nrows=0,
+        )
+        return df_cnv.columns.tolist()
+    except Exception as e:
+        print(f"Error loading CNV file: {e}")
+        return []
+
+
 @callback(
     Output("confirm-study", "displayed"),
     Output("confirm-study", "message"),
@@ -1113,6 +1145,10 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     State("dd-identifier-columns", "value"),
     State("dd-vaf", "value"),
     State("input-vaf-score", "value"),
+    State("cnv-file", "fileNames"),
+    State("cnv-separator", "value"),
+    State("cnv-skiprow", "value"),
+    State("dd-column-cnv-identifier", "value"),
     State("seed-trials", "value"),
     State("clustering-resolution", "value"),
     prevent_initial_call=True,
@@ -1138,6 +1174,10 @@ def create_study(
     c_identifier,
     c_vaf,
     vaf_score,
+    cnv_filename,
+    cnv_separator,
+    cnv_skiprow,
+    c_cnv_identifier,
     seed_trials,
     clustering_resolution,
 ):
@@ -1212,11 +1252,17 @@ def create_study(
         Path("temp", clinical_sample_filename[0]).rename(
             Path("study", input_namestudy, "input", "clinical_sample.txt"),
         )
+    # CNV DATA
+    if cnv_filename is not None:
+        Path("temp", cnv_filename[0]).rename(
+            Path("study", input_namestudy, "input", "cnv_data.txt"),
+        )
     # GENERATE JSON CONFIG
     config_dict = {}
     config_dict["paths"] = {}
     config_dict["clinical_data"] = {}
     config_dict["mutation"] = {}
+    config_dict["cnv"] = {}
     config_dict["name"] = input_namestudy
     config_dict["paths"]["data_mutational"] = str(
         Path(
@@ -1234,8 +1280,12 @@ def create_study(
     config_dict["paths"]["data_clinical_sample"] = ""
     config_dict["paths"]["data_clinical_patient_sep"] = "\t"
     config_dict["paths"]["data_clinical_patient_skip"] = 0
+    config_dict["paths"]["data_cnv"] = ""
+    config_dict["paths"]["data_cnv_sep"] = "\t"
+    config_dict["paths"]["data_cnv_skip"] = 0
     config_dict["mutation"]["column_gene"] = c_gene
     config_dict["mutation"]["column_sample_name"] = c_sample_mutation
+    config_dict["cnv"]["column_cnv_identifier"] = "" if c_cnv_identifier is None else c_cnv_identifier
     config_dict["seed_trials"] = seed_trials
     config_dict["clustering_resolution"] = clustering_resolution
     # REMOVE EXTRA SEPARATOR BEFOR JOIN
@@ -1278,6 +1328,17 @@ def create_study(
             clinical_sample_skiprow
         )
         config_dict["clinical_data"]["column_sample_name"] = c_sample_name
+    if cnv_filename is not None:
+        config_dict["paths"]["data_cnv"] = str(
+            Path(
+                "study",
+                input_namestudy,
+                "input",
+                "cnv_data.txt",
+            ),
+        )
+        config_dict["paths"]["data_cnv_sep"] = "\t"
+        config_dict["paths"]["data_cnv_skip"] = cnv_skiprow
     PATH_CONFIG = Path("study", input_namestudy, "config.json")
     with PATH_CONFIG.open("w", encoding="utf-8") as f:
         json.dump(config_dict, f, indent=4)
@@ -1495,6 +1556,23 @@ PAGE_STUDY_DESCRIPTION = [
         ],
         justify="evenly",
     ),
+    dbc.Row([html.Br()]),
+    # 4 ROW - CNV AND MUTATION FIGURE
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    dcc.Graph(
+                        id="fig_cnv_mutations",
+                        className="add-border",
+                        style={"width": "100%", "height": "35vh"},
+                    ),
+                ],
+                lg=12,
+            ),
+        ],
+        justify="evenly",
+    ),
 ]
 
 
@@ -1557,6 +1635,7 @@ def update_graph(layout):
     Output("cytoscape-graph", "elements"),
     Output("fig_pie", "figure"),
     Output("fig_degree", "figure"),
+    Output("fig_cnv_mutations", "figure"),
     Output("span_n_patient", "children"),
     Output("span_n_variants", "children"),
     Output("span_n_genes", "children"),
@@ -1566,6 +1645,7 @@ def update_graph(layout):
 def update_cluster(cluster):
     if cluster is None:
         return (
+            no_update,
             no_update,
             no_update,
             no_update,
@@ -1614,6 +1694,8 @@ def update_cluster(cluster):
         y="Degree",
         title="Mutation Degree",
     )
+    # CNV AND MUTATION FIGURE
+    fig_cnv_mutations = libu.create_cnv_mutation_figure(GRAPH, cluster)
     # PATIENTS NUMBER
     n_patients = len(
         [
@@ -1637,6 +1719,7 @@ def update_cluster(cluster):
         cluster_elements,
         fig_pie,
         fig_degree,
+        fig_cnv_mutations,
         n_patients,
         n_variants,
         n_genes,
@@ -1657,6 +1740,21 @@ PAGE_PATHWAY_ANALYSIS = [
                     html.Br(),
                 ],
                 lg=6,
+            ),
+            # EVENT TYPE SELECTOR
+            dbc.Col(
+                [
+                    html.Span("Event type", className="span_selector"),
+                    dcc.Dropdown(
+                        ["MUT", "CNV_GAIN", "CNV_LOSS"],
+                        "MUT",
+                        id="dd-event-type",
+                        persistence=True,
+                        persistence_type="memory",
+                    ),
+                    html.Br(),
+                ],
+                lg=3,
             ),
             # PVALUE SELECTOR
             dbc.Col(
@@ -1803,20 +1901,21 @@ def generate_pathway_fig(df, pvalue, adj_pvalue, title):
     Output("fig_go", "figure"),
     [
         Input("dd-cluster", "value"),
+        Input("dd-event-type", "value"),
         Input("dd-pvalue", "value"),
         Input("dd-adjusted-pvalue", "value"),
         Input("radio_fig_go", "value"),
     ],
 )
-def update_go(cluster, pvalue, adj_pvalue, p_type):
+def update_go(cluster, event_type, pvalue, adj_pvalue, p_type):
     if cluster is None:
         return no_update
-    global CLUSTER_SELECTED
-    CLUSTER_SELECTED = cluster
+    
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
             "pathway_analysis",
+            event_type,
             "GO",
             f"{p_type}_{cluster}.csv",
         ),
@@ -1830,19 +1929,20 @@ def update_go(cluster, pvalue, adj_pvalue, p_type):
     Output("fig_kegg", "figure"),
     [
         Input("dd-cluster", "value"),
+        Input("dd-event-type", "value"),
         Input("dd-pvalue", "value"),
         Input("dd-adjusted-pvalue", "value"),
     ],
 )
-def update_kegg(cluster, pvalue, adj_pvalue):
+def update_kegg(cluster, event_type, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
-    global CLUSTER_SELECTED
-    CLUSTER_SELECTED = cluster
+
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
             "pathway_analysis",
+            event_type,
             "KEGG",
             f"kegg_{cluster}.csv",
         ),
@@ -1856,19 +1956,20 @@ def update_kegg(cluster, pvalue, adj_pvalue):
     Output("fig_reactome", "figure"),
     [
         Input("dd-cluster", "value"),
+        Input("dd-event-type", "value"),
         Input("dd-pvalue", "value"),
         Input("dd-adjusted-pvalue", "value"),
     ],
 )
-def update_reactome(cluster, pvalue, adj_pvalue):
+def update_reactome(cluster, event_type, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
-    global CLUSTER_SELECTED
-    CLUSTER_SELECTED = cluster
+
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
             "pathway_analysis",
+            event_type,
             "REACTOME",
             f"reactome_{cluster}.csv",
         ),
@@ -1882,19 +1983,20 @@ def update_reactome(cluster, pvalue, adj_pvalue):
     Output("fig_wiki", "figure"),
     [
         Input("dd-cluster", "value"),
+        Input("dd-event-type", "value"),
         Input("dd-pvalue", "value"),
         Input("dd-adjusted-pvalue", "value"),
     ],
 )
-def update_wiki(cluster, pvalue, adj_pvalue):
+def update_wiki(cluster, event_type, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
-    global CLUSTER_SELECTED
-    CLUSTER_SELECTED = cluster
+
     df_data = pd.read_csv(
         Path(
             CONTEXT_DATA["out_root_path"],
             "pathway_analysis",
+            event_type,
             "WIKI",
             f"wiki_{cluster}.csv",
         ),
