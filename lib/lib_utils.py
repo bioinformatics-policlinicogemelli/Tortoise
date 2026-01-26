@@ -206,7 +206,8 @@ def enrichment_with_r(path_save, map_cluster) -> None:
     """Perform enrichment analysis using an R script for given gene clusters.
 
     This function loads an R script and uses it to perform enrichment analysis
-    on gene clusters. The results are saved in specified directories.
+    on gene clusters separated by event type (MUT, CNV_GAIN, CNV_LOSS).
+    The results are saved in specified directories organized by event type.
 
     Args:
         path_save (str): The path where the results will be saved.
@@ -223,32 +224,34 @@ def enrichment_with_r(path_save, map_cluster) -> None:
     r_func = robjects.globalenv["all_analisi"]
     g_path = Path(path_save, "gene_cluster_list")
     o_path = Path(path_save, "pathway_analysis")
-    Path(o_path, "GO").mkdir(parents=True, exist_ok=True)
-    Path(o_path, "KEGG").mkdir(parents=True, exist_ok=True)
-    Path(o_path, "WIKI").mkdir(parents=True, exist_ok=True)
-    Path(o_path, "REACTOME").mkdir(parents=True, exist_ok=True)
-    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
-        with Pool() as p:
-            p.map(
-                r_func,
-                [
-                    [
-                        str(g_path.joinpath(f"genes_cluster_{c}.csv")),
-                        c,
-                        str(o_path),
-                    ]
-                    for c in map_cluster
-                ],
-            )
-    else:
+    
+    # Event types to process
+    event_types = ["MUT", "CNV_GAIN", "CNV_LOSS"]
+    
+    # Create base pathway_analysis directory
+    o_path.mkdir(parents=True, exist_ok=True)
+    
+    # Prepare list of parameters for enrichment analysis
+    params_list = []
+    for event_type in event_types:
         for c in map_cluster:
-            r_func(
-                [
-                    str(g_path.joinpath(f"genes_cluster_{c}.csv")),
+            gene_file = g_path.joinpath(f"genes_cluster_{c}_{event_type}.csv")
+            # Only add if gene file exists and has content
+            if gene_file.exists() and gene_file.stat().st_size > 0:
+                params_list.append([
+                    str(gene_file),
                     c,
                     str(o_path),
-                ],
-            )
+                    event_type,
+                ])
+    
+    # Run enrichment analysis in parallel or sequential
+    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
+        with Pool() as p:
+            p.map(r_func, params_list)
+    else:
+        for params in params_list:
+            r_func(params)
 
 
 def adding_category_mutation(data_mutational, list_columns):

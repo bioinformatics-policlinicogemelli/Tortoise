@@ -124,6 +124,8 @@ CONTEXT_DATA = {
         "num_patient": 0,
         "num_gene": 0,
         "num_variant": 0,
+        "num_cnv_gain": 0,
+        "num_cnv_loss": 0,
         "num_cluster": 0,
         "modularity": 0,
     },
@@ -141,10 +143,29 @@ def filter_graph(cluster):
         _map = e.attributes()
         _map["id"] = e.index
         _map["variants"] = None
+        # Build classes: vertex_type + event_type for variants
+        classes = e["vertex_type"]
+        if e["vertex_type"] == "VARIANT":
+            try:
+                event_type = e["event_type"]
+            except KeyError:
+                event_type = "MUT"
+            # Handle CNV variants: convert "CNV" + "cnv_direction" to CNV_GAIN or CNV_LOSS
+            if event_type == "CNV":
+                try:
+                    cnv_direction = e["cnv_direction"]
+                except KeyError:
+                    cnv_direction = ""
+                if cnv_direction == "Gain":
+                    classes += " CNV_GAIN"
+                elif cnv_direction == "Loss":
+                    classes += " CNV_LOSS"
+            else:
+                classes += f" {event_type}"
         g_ele.append(
             {
                 "data": _map,
-                "classes": e["vertex_type"],
+                "classes": classes,
                 "id": e.index,
                 "grabbable": False,
             },
@@ -347,6 +368,25 @@ PAGE_HOME = [
             ),
         ],
     ),
+    # CNV GAINS/LOSSES
+    dbc.Row(
+        [
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-cnv-gain",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+            dbc.Col(
+                html.Span(
+                    id="dd-study-info-cnv-loss",
+                    className="dd_study_infos",
+                ),
+                lg=6,
+            ),
+        ],
+    ),
     # CLUSTER/MODULARITY
     dbc.Row(
         [
@@ -436,6 +476,8 @@ def update_dropdown_liststudy(_):
     Output("dd-study-info-patient", "children"),
     Output("dd-study-info-gene", "children"),
     Output("dd-study-info-variant", "children"),
+    Output("dd-study-info-cnv-gain", "children"),
+    Output("dd-study-info-cnv-loss", "children"),
     Output("dd-study-info-cluster", "children"),
     Output("dd-study-info-modularity", "children"),
     Output("dd-study-info-seed", "children"),
@@ -455,7 +497,7 @@ def select_study(value) -> str:
     global BOX_FIG_SELECTED_2
 
     if value is None:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     # prevent reload
     if value == CONTEXT_DATA["name_study"]:
         return (
@@ -463,6 +505,8 @@ def select_study(value) -> str:
             f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
             f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
             f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
+            f"Number of CNV gains: {CONTEXT_DATA['stats']['num_cnv_gain']}",
+            f"Number of CNV losses: {CONTEXT_DATA['stats']['num_cnv_loss']}",
             f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
             f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
             f"Seed: {CONTEXT_DATA['stats']['seed']}",
@@ -520,6 +564,23 @@ def select_study(value) -> str:
     CONTEXT_DATA["stats"]["num_gene"] = stats["Gene"].sum()
     CONTEXT_DATA["stats"]["num_variant"] = stats["Variant"].sum()
     CONTEXT_DATA["stats"]["num_cluster"] = len(stats)
+    # Count CNV gains and losses separately
+    num_cnv_gain = 0
+    num_cnv_loss = 0
+    for v in GRAPH.vs:
+        if v["vertex_type"] == "VARIANT":
+            try:
+                event_type = v["event_type"]
+                if event_type == "CNV":
+                    cnv_direction = v["cnv_direction"]
+                    if cnv_direction == "Gain":
+                        num_cnv_gain += 1
+                    elif cnv_direction == "Loss":
+                        num_cnv_loss += 1
+            except KeyError:
+                pass
+    CONTEXT_DATA["stats"]["num_cnv_gain"] = num_cnv_gain
+    CONTEXT_DATA["stats"]["num_cnv_loss"] = num_cnv_loss
     with (
         CONTEXT_DATA["out_root_path"]
         .joinpath("modularity.info")
@@ -538,6 +599,8 @@ def select_study(value) -> str:
         f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
         f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
         f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
+        f"Number of CNV gains: {CONTEXT_DATA['stats']['num_cnv_gain']}",
+        f"Number of CNV losses: {CONTEXT_DATA['stats']['num_cnv_loss']}",
         f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
         f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
         f"Seed: {CONTEXT_DATA['stats']['seed']}",
@@ -1445,6 +1508,24 @@ PAGE_STUDY_DESCRIPTION = [
             ),
             dbc.Col(
                 [
+                    html.Span("CNV Gains"),
+                    html.Hr(),
+                    html.Span(0, id="span_n_cnv_gain"),
+                ],
+                width=2,
+                className="info_block add-border",
+            ),
+            dbc.Col(
+                [
+                    html.Span("CNV Losses"),
+                    html.Hr(),
+                    html.Span(0, id="span_n_cnv_loss"),
+                ],
+                width=2,
+                className="info_block add-border",
+            ),
+            dbc.Col(
+                [
                     html.Span("Variant centroid"),
                     html.Hr(),
                     html.Span("None", id="span_variant_centroids"),
@@ -1454,6 +1535,79 @@ PAGE_STUDY_DESCRIPTION = [
             ),
         ],
         justify="evenly",
+    ),
+    dbc.Row([html.Br()]),
+    # LEGEND ROW
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H6("Graph Legend:", style={"fontWeight": "bold", "fontSize": "14px"}),
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "●",
+                                        style={
+                                            "color": "#1f77b4",
+                                            "fontSize": "14px",
+                                            "marginRight": "6px",
+                                        },
+                                    ),
+                                    html.Span("Mutations (MUT)", style={"fontSize": "12px"}),
+                                ],
+                                style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "●",
+                                        style={
+                                            "color": "#2ca02c",
+                                            "fontSize": "14px",
+                                            "marginRight": "6px",
+                                        },
+                                    ),
+                                    html.Span("CNV Gain", style={"fontSize": "12px"}),
+                                ],
+                                style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "●",
+                                        style={
+                                            "color": "#d62728",
+                                            "fontSize": "14px",
+                                            "marginRight": "6px",
+                                        },
+                                    ),
+                                    html.Span("CNV Loss", style={"fontSize": "12px"}),
+                                ],
+                                style={"display": "flex", "alignItems": "center", "marginBottom": "4px"},
+                            ),
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "▲",
+                                        style={
+                                            "color": "coral",
+                                            "fontSize": "14px",
+                                            "marginRight": "6px",
+                                        },
+                                    ),
+                                    html.Span("Patients", style={"fontSize": "12px"}),
+                                ],
+                                style={"display": "flex", "alignItems": "center"},
+                            ),
+                        ],
+                        style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "15px"},
+                    ),
+                ],
+                lg=6,
+            ),
+        ],
     ),
     dbc.Row([html.Br()]),
     # 2 ROW
@@ -1484,7 +1638,7 @@ PAGE_STUDY_DESCRIPTION = [
                                     "shape": "triangle",
                                 },
                             },
-                            # VARIANTI CERCHI BLUE
+                            # VARIANTI DEFAULT (fallback)
                             {
                                 "selector": ".VARIANT",
                                 "style": {
@@ -1492,11 +1646,35 @@ PAGE_STUDY_DESCRIPTION = [
                                     "shape": "circle",
                                 },
                             },
-                            # SELECTEDƒco
+                            # VARIANTI - MUTATIONS (BLUE) - More specific, goes after default
+                            {
+                                "selector": ".VARIANT.MUT",
+                                "style": {
+                                    "background-color": "#1f77b4",
+                                    "shape": "circle",
+                                },
+                            },
+                            # VARIANTI - CNV GAIN (GREEN) - More specific, goes after default
+                            {
+                                "selector": ".VARIANT.CNV_GAIN",
+                                "style": {
+                                    "background-color": "#2ca02c",
+                                    "shape": "circle",
+                                },
+                            },
+                            # VARIANTI - CNV LOSS (YELLOW) - More specific, goes after default
+                            {
+                                "selector": ".VARIANT.CNV_LOSS",
+                                "style": {
+                                    "background-color": "#facd3a",
+                                    "shape": "circle",
+                                },
+                            },
+                            # SELECTED
                             {
                                 "selector": ":selected",
                                 "style": {
-                                    "background-color": "#02cd79",
+                                    "background-color": "#9467BD",
                                 },
                             },
                         ],
@@ -1520,6 +1698,7 @@ PAGE_STUDY_DESCRIPTION = [
                         persistence=True,
                         persistence_type="memory",
                         style={"width": "100%", "height": "2vh"},
+                        labelStyle={"margin-right": "25px","padding": "4px 0"},
                     ),
                 ],
                 lg=6,
@@ -1639,12 +1818,16 @@ def update_graph(layout):
     Output("span_n_patient", "children"),
     Output("span_n_variants", "children"),
     Output("span_n_genes", "children"),
+    Output("span_n_cnv_gain", "children"),
+    Output("span_n_cnv_loss", "children"),
     Output("span_variant_centroids", "children"),
     Input("dd-cluster", "value"),
 )
 def update_cluster(cluster):
     if cluster is None:
         return (
+            no_update,
+            no_update,
             no_update,
             no_update,
             no_update,
@@ -1714,6 +1897,21 @@ def update_cluster(cluster):
         variant_centroids = "More than one"
     else:
         variant_centroids = df_variant.iloc[0]["Variants"]
+    # COUNT CNV GAINS AND LOSSES IN THIS CLUSTER
+    n_cnv_gain = 0
+    n_cnv_loss = 0
+    for v in GRAPH.vs:
+        if v["vertex_type"] == "VARIANT" and v["cluster"] == cluster:
+            try:
+                event_type = v["event_type"]
+                if event_type == "CNV":
+                    cnv_direction = v["cnv_direction"]
+                    if cnv_direction == "Gain":
+                        n_cnv_gain += 1
+                    elif cnv_direction == "Loss":
+                        n_cnv_loss += 1
+            except KeyError:
+                pass
     # RETURN
     return (
         cluster_elements,
@@ -1723,6 +1921,8 @@ def update_cluster(cluster):
         n_patients,
         n_variants,
         n_genes,
+        n_cnv_gain,
+        n_cnv_loss,
         variant_centroids,
     )
 
@@ -1820,7 +2020,10 @@ PAGE_PATHWAY_ANALYSIS = [
                         ],
                         # Valore predefinito
                         value="biological",
-                        labelStyle={"display": "inline-block"},
+                        labelStyle={"display": "inline-block",
+                                    "margin-right": "25px",
+                                    "padding": "4px 0"
+                                    },
                         id="radio_fig_go",
                         persistence=True,
                         persistence_type="memory",
@@ -1867,12 +2070,35 @@ PAGE_PATHWAY_ANALYSIS = [
 
 
 def generate_pathway_fig(df, pvalue, adj_pvalue, title):
+    if df is None or df.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14)
+        )
+        fig.update_layout(title=title, xaxis_title="Genes_Count", yaxis_title="Terms")
+        return fig
+    
     col_name = "P.value"
     label_name = "Pvalue"
     if adj_pvalue == "True":
         col_name = "Adjusted.P.value"
         label_name = "Adjusted Pvalue"
     df_data = df[df[col_name] < pvalue]
+    
+    if df_data.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No significant results",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14)
+        )
+        fig.update_layout(title=title, xaxis_title="Genes_Count", yaxis_title="Terms")
+        return fig
+    
     df_data = df_data.sort_values(by=[col_name], ascending=False)[-25:]
     df_data["Count_gene"] = df_data.apply(
         lambda e: len(e["Genes"].split(";")),
@@ -1911,17 +2137,20 @@ def update_go(cluster, event_type, pvalue, adj_pvalue, p_type):
     if cluster is None:
         return no_update
     
-    df_data = pd.read_csv(
-        Path(
-            CONTEXT_DATA["out_root_path"],
-            "pathway_analysis",
-            event_type,
-            "GO",
-            f"{p_type}_{cluster}.csv",
-        ),
-        engine="python",
-    )
-    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "GO")
+    try:
+        df_data = pd.read_csv(
+            Path(
+                CONTEXT_DATA["out_root_path"],
+                "pathway_analysis",
+                event_type,
+                "GO",
+                f"{p_type}_{cluster}.csv",
+            ),
+            engine="python",
+        )
+        return generate_pathway_fig(df_data, pvalue, adj_pvalue, "GO")
+    except FileNotFoundError:
+        return generate_pathway_fig(None, pvalue, adj_pvalue, "GO")
 
 
 # UPDATE KEGG FIGURE
@@ -1938,17 +2167,20 @@ def update_kegg(cluster, event_type, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
 
-    df_data = pd.read_csv(
-        Path(
-            CONTEXT_DATA["out_root_path"],
-            "pathway_analysis",
-            event_type,
-            "KEGG",
-            f"kegg_{cluster}.csv",
-        ),
-        engine="python",
-    )
-    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "KEGG")
+    try:
+        df_data = pd.read_csv(
+            Path(
+                CONTEXT_DATA["out_root_path"],
+                "pathway_analysis",
+                event_type,
+                "KEGG",
+                f"kegg_{cluster}.csv",
+            ),
+            engine="python",
+        )
+        return generate_pathway_fig(df_data, pvalue, adj_pvalue, "KEGG")
+    except FileNotFoundError:
+        return generate_pathway_fig(None, pvalue, adj_pvalue, "KEGG")
 
 
 # UPDATE REACTOME FIGURE
@@ -1965,17 +2197,20 @@ def update_reactome(cluster, event_type, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
 
-    df_data = pd.read_csv(
-        Path(
-            CONTEXT_DATA["out_root_path"],
-            "pathway_analysis",
-            event_type,
-            "REACTOME",
-            f"reactome_{cluster}.csv",
-        ),
-        engine="python",
-    )
-    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "REACTOME")
+    try:
+        df_data = pd.read_csv(
+            Path(
+                CONTEXT_DATA["out_root_path"],
+                "pathway_analysis",
+                event_type,
+                "REACTOME",
+                f"reactome_{cluster}.csv",
+            ),
+            engine="python",
+        )
+        return generate_pathway_fig(df_data, pvalue, adj_pvalue, "REACTOME")
+    except FileNotFoundError:
+        return generate_pathway_fig(None, pvalue, adj_pvalue, "REACTOME")
 
 
 # UPDATE WIKI FIGURE
@@ -1992,17 +2227,20 @@ def update_wiki(cluster, event_type, pvalue, adj_pvalue):
     if cluster is None:
         return no_update
 
-    df_data = pd.read_csv(
-        Path(
-            CONTEXT_DATA["out_root_path"],
-            "pathway_analysis",
-            event_type,
-            "WIKI",
-            f"wiki_{cluster}.csv",
-        ),
-        engine="python",
-    )
-    return generate_pathway_fig(df_data, pvalue, adj_pvalue, "WIKI")
+    try:
+        df_data = pd.read_csv(
+            Path(
+                CONTEXT_DATA["out_root_path"],
+                "pathway_analysis",
+                event_type,
+                "WIKI",
+                f"wiki_{cluster}.csv",
+            ),
+            engine="python",
+        )
+        return generate_pathway_fig(df_data, pvalue, adj_pvalue, "WIKI")
+    except FileNotFoundError:
+        return generate_pathway_fig(None, pvalue, adj_pvalue, "WIKI")
 
 
 # CLINICAL DATA
