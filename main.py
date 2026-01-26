@@ -1578,7 +1578,7 @@ PAGE_STUDY_DESCRIPTION = [
                                     html.Span(
                                         "●",
                                         style={
-                                            "color": "#d62728",
+                                            "color": "#facd3a",
                                             "fontSize": "14px",
                                             "marginRight": "6px",
                                         },
@@ -1721,7 +1721,7 @@ PAGE_STUDY_DESCRIPTION = [
     # 3 ROW
     dbc.Row(
         [
-            # FIGURE DEGREE
+            # FIGURE DEGREE - MUTATIONS
             dbc.Col(
                 [
                     dcc.Graph(
@@ -1730,7 +1730,18 @@ PAGE_STUDY_DESCRIPTION = [
                         style={"width": "100%", "height": "35vh"},
                     ),
                 ],
-                lg=8,
+                lg=6,
+            ),
+            # FIGURE DEGREE - CNV
+            dbc.Col(
+                [
+                    dcc.Graph(
+                        id="fig_degree_cnv",
+                        className="add-border",
+                        style={"width": "100%", "height": "35vh"},
+                    ),
+                ],
+                lg=6,
             ),
         ],
         justify="evenly",
@@ -1814,6 +1825,7 @@ def update_graph(layout):
     Output("cytoscape-graph", "elements"),
     Output("fig_pie", "figure"),
     Output("fig_degree", "figure"),
+    Output("fig_degree_cnv", "figure"),
     Output("fig_cnv_mutations", "figure"),
     Output("span_n_patient", "children"),
     Output("span_n_variants", "children"),
@@ -1826,6 +1838,7 @@ def update_graph(layout):
 def update_cluster(cluster):
     if cluster is None:
         return (
+            no_update,
             no_update,
             no_update,
             no_update,
@@ -1869,14 +1882,44 @@ def update_cluster(cluster):
         engine="python",
     )
     n_variants = len(df_variant)
-    # FIGURE DEGREE
-    df_variant = df_variant.sort_values(by=["Degree"], ascending=False)[:15]
-    fig_degree = px.bar(
-        df_variant,
-        x="Variants",
-        y="Degree",
-        title="Mutation Degree",
-    )
+    # Get mutations and CNVs from graph
+    mutations = []
+    cnvs = []
+    for v in GRAPH.vs:
+        if v["vertex_type"] == "VARIANT" and v["cluster"] == cluster:
+            variant_name = v["name"]
+            try:
+                event_type = v["event_type"]
+                if event_type == "CNV":
+                    cnvs.append(variant_name)
+                else:
+                    mutations.append(variant_name)
+            except KeyError:
+                mutations.append(variant_name)
+    # FIGURE DEGREE - MUTATIONS ONLY
+    df_variant_mut = df_variant[df_variant["Variants"].isin(mutations)]
+    df_variant_mut = df_variant_mut.sort_values(by=["Degree"], ascending=False)[:15]
+    if len(df_variant_mut) > 0:
+        fig_degree = px.bar(
+            df_variant_mut,
+            x="Variants",
+            y="Degree",
+            title="Mutation Degree",
+        )
+    else:
+        fig_degree = px.bar(title="Mutation Degree")
+    # FIGURE DEGREE - CNV ONLY
+    df_variant_cnv = df_variant[df_variant["Variants"].isin(cnvs)]
+    df_variant_cnv = df_variant_cnv.sort_values(by=["Degree"], ascending=False)[:15]
+    if len(df_variant_cnv) > 0:
+        fig_degree_cnv = px.bar(
+            df_variant_cnv,
+            x="Variants",
+            y="Degree",
+            title="CNV Degree",
+        )
+    else:
+        fig_degree_cnv = px.bar(title="CNV Degree")
     # CNV AND MUTATION FIGURE
     fig_cnv_mutations = libu.create_cnv_mutation_figure(GRAPH, cluster)
     # PATIENTS NUMBER
@@ -1917,6 +1960,7 @@ def update_cluster(cluster):
         cluster_elements,
         fig_pie,
         fig_degree,
+        fig_degree_cnv,
         fig_cnv_mutations,
         n_patients,
         n_variants,
@@ -1946,8 +1990,12 @@ PAGE_PATHWAY_ANALYSIS = [
                 [
                     html.Span("Event type", className="span_selector"),
                     dcc.Dropdown(
-                        ["MUT", "CNV_GAIN", "CNV_LOSS"],
-                        "MUT",
+                        options = [
+                            {"label": "Mutations", "value": "MUT"},
+                            {"label": "CNV Gains", "value": "CNV_GAIN"},
+                            {"label": "CNV Losses", "value": "CNV_LOSS"},
+                        ],
+                        value="MUT",
                         id="dd-event-type",
                         persistence=True,
                         persistence_type="memory",
@@ -2295,7 +2343,48 @@ PAGE_CLINICAL_DATA = [
             ),
         ],
     ),
-    dbc.Row([dash_table.DataTable(id="table_clinical_data")]),
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    dbc.InputGroup(
+                        [
+                            dbc.InputGroupText("🔍"),
+                            dbc.Input(
+                                id="clinical-data-filter",
+                                placeholder="Filter table by typing...",
+                                type="text",
+                                debounce=True,
+                            ),
+                        ],
+                    ),
+                ],
+                lg=6,
+            ),
+        ],
+        className="mb-3",
+    ),
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    dash_table.DataTable(
+                        id="table_clinical_data",
+                        sort_action="native",
+                        page_action="native",
+                        page_current=0,
+                        page_size=10,
+                        style_cell={"padding": "10px"},
+                        style_header={
+                            "backgroundColor": "rgb(230, 230, 230)",
+                            "fontWeight": "bold",
+                        },
+                    ),
+                ],
+                lg=12,
+            ),
+        ],
+    ),
 ]
 
 
@@ -2364,14 +2453,29 @@ def update_box_2(cluster, col_name):
 
 
 # TABLE CLINICAL_DATA:
-@callback(Output("table_clinical_data", "data"), Input("dd-cluster", "value"))
-def update_table_clinical_data(cluster):
+@callback(
+    Output("table_clinical_data", "data"),
+    Output("table_clinical_data", "columns"),
+    Input("dd-cluster", "value"),
+    Input("clinical-data-filter", "value"),
+)
+def update_table_clinical_data(cluster, filter_text):
     if cluster is None:
-        return no_update
+        return no_update, no_update
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
     cluster_values = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
-    return cluster_values.to_dict("records")
+    
+    # Filter by text input if provided
+    if filter_text:
+        filter_text_lower = filter_text.lower()
+        mask = cluster_values.astype(str).apply(
+            lambda x: x.str.contains(filter_text_lower, case=False).any(), axis=1
+        )
+        cluster_values = cluster_values[mask]
+    
+    columns = [{"name": i, "id": i} for i in cluster_values.columns]
+    return cluster_values.to_dict("records"), columns
 
 
 # SURVIVAL ANALYSIS
