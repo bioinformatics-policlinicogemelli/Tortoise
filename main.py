@@ -168,6 +168,7 @@ def load_png_as_base64(png_path):
 APP = Dash(
     title=APP_NAME,
     external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME],
+    suppress_callback_exceptions=True,
 )
 du.configure_upload(APP, "temp/", use_upload_id=False)
 # ICON -> https://fontawesome.com/search
@@ -243,15 +244,32 @@ SIDEBAR = html.Div(
                 dbc.NavLink(
                     [
                         html.I(className="fa-solid fa-chart-line"),
-                        html.Span(
-                            "Survival Analysis",
-                            className="navbar_span",
-                        ),
+                        html.Span(" Survival Analysis"),
                     ],
-                    href="/survival_analysis",
+                    href="/survival",
                     active="exact",
                     className="navbar_entity",
                 ),
+
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-heartbeat"),
+                        html.Span("  └ Overall Survival (OS)"),
+                    ],
+                    href="/survival/os",
+                    className="ms-3",
+                ),
+
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-hourglass-half"),
+                        html.Span("  └ Progression-Free Survival (PFS)"),
+                    ],
+                    href="/survival/pfs",
+                    className="ms-3",
+                ),
+
+
                 # CLUSTER COMP
                 dbc.NavLink(
                     [
@@ -455,12 +473,23 @@ def redirect_pages(pathname):
         selected_page = PAGE_STUDY_DESCRIPTION
     elif pathname == "/pathway_analysis":
         selected_page = PAGE_PATHWAY_ANALYSIS
+
+    elif pathname == "/survival":
+        selected_page = PAGE_SURVIVAL_HOME
+
+    elif pathname == "/survival/os":
+        selected_page = PAGE_SURVIVAL_HOME
+
+    elif pathname == "/survival/pfs":
+        selected_page = PAGE_SURVIVAL_HOME
     elif pathname == "/cluster_comparision":
         selected_page = PAGE_CLUSTER_COMPARISION
     elif pathname == "/clinical_data":
         selected_page = PAGE_CLINICAL_DATA
-    elif pathname == "/survival_analysis":
-        selected_page = PAGE_SURVIVAL_ANALYSIS
+
+
+
+
 
     elif pathname == "/resolution":
         selected_page = PAGE_RESOLUTION_OVERVIEW
@@ -640,6 +669,31 @@ def select_study(value) -> str:
                     DF_CLINICAL_DATA["PFS_EVENT"],
                     errors="coerce",
                 )
+
+            # ==================================================
+            # CREATE *_EVENT_string FOR LEGACY PLOTS (FIX)
+            # ==================================================
+
+            # OS
+            if "OS_EVENT" in DF_CLINICAL_DATA.columns:
+
+                DF_CLINICAL_DATA["OS_EVENT_string"] = DF_CLINICAL_DATA["OS_EVENT"].map(
+                    {
+                        1.0: "Event",
+                        0.0: "Censored",
+                    }
+                )
+
+            # PFS
+            if "PFS_EVENT" in DF_CLINICAL_DATA.columns:
+
+                DF_CLINICAL_DATA["PFS_EVENT_string"] = DF_CLINICAL_DATA["PFS_EVENT"].map(
+                    {
+                        1.0: "Event",
+                        0.0: "Censored",
+                    }
+                )
+
 
         except Exception as e:
             print("[WARNING] Survival preparation failed")
@@ -2064,6 +2118,7 @@ def update_table_clinical_data(cluster):
 
 
 # SURVIVAL ANALYSIS
+"""
 PAGE_SURVIVAL_ANALYSIS = [
     # DIALOG INFO NODE
     dbc.Modal(
@@ -2332,6 +2387,285 @@ def update_survival_comparison(list_clusters):
         ],
     )
     return fig, fig_stats
+"""
+
+
+# =====================================
+# SURVIVAL OS / PFS (NEW)
+# =====================================
+
+PAGE_SURVIVAL_OS = [
+
+    dbc.Row([html.H3("Overall Survival (OS)")]),
+    html.Hr(),
+
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.Span("Cluster"),
+                    dcc.Dropdown(id="dd-os-cluster"),
+                ],
+                lg=4,
+            ),
+        ]
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col(
+                dcc.Graph(id="os-survival-figure"),
+                lg=8,
+            ),
+            dbc.Col(
+                dcc.Graph(id="os-survival-stat"),
+                lg=4,
+            ),
+        ]
+    ),
+]
+
+
+PAGE_SURVIVAL_PFS = [
+
+    dbc.Row([html.H3("Progression-Free Survival (PFS)")]),
+    html.Hr(),
+
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.Span("Cluster"),
+                    dcc.Dropdown(id="dd-pfs-cluster"),
+                ],
+                lg=4,
+            ),
+        ]
+    ),
+
+    dbc.Row(
+        [
+            dbc.Col(
+                dcc.Graph(id="pfs-survival-figure"),
+                lg=8,
+            ),
+            dbc.Col(
+                dcc.Graph(id="pfs-survival-stat"),
+                lg=4,
+            ),
+        ]
+    ),
+]
+
+# =====================================
+# SURVIVAL HOME (PARENT PAGE)
+# =====================================
+
+PAGE_SURVIVAL_HOME = [
+
+    dbc.Row([html.H3("Survival Analysis")]),
+    html.Hr(),
+
+    dbc.Tabs(
+        id="tabs-survival-main",
+        active_tab="tab-os",
+        children=[
+
+            dbc.Tab(
+                label="Overall Survival (OS)",
+                tab_id="tab-os",
+                children=PAGE_SURVIVAL_OS,
+            ),
+
+            dbc.Tab(
+                label="Progression-Free Survival (PFS)",
+                tab_id="tab-pfs",
+                children=PAGE_SURVIVAL_PFS,
+            ),
+
+        ],
+    ),
+]
+
+@callback(
+    Output("tabs-survival-main", "active_tab"),
+    Input("url", "pathname"),
+    prevent_initial_call=True,
+)
+def sync_survival_tabs(pathname):
+
+    if pathname == "/survival/pfs":
+        return "tab-pfs"
+
+    if pathname == "/survival/os":
+        return "tab-os"
+
+    return no_update
+
+
+"""
+@callback(
+    Output("dd-os-cluster", "options"),
+    Output("dd-os-cluster", "value"),
+    Input("url", "pathname"),
+)
+def populate_os_clusters(pathname):
+
+    if pathname != "/survival/os":
+        return no_update, no_update
+
+    if not CLUSTERS_INDEX:
+        return [], None
+
+    opts = list(CLUSTERS_INDEX)
+
+    return opts, opts[0]
+
+
+@callback(
+    Output("dd-pfs-cluster", "options"),
+    Output("dd-pfs-cluster", "value"),
+    Input("url", "pathname"),
+)
+def populate_pfs_clusters(pathname):
+
+    if pathname != "/survival/pfs":
+        return no_update, no_update
+
+    if not CLUSTERS_INDEX:
+        return [], None
+
+    opts = list(CLUSTERS_INDEX)
+
+    return opts, opts[0]
+
+"""
+
+# =====================================
+# POPULATE OS / PFS DROPDOWNS (TAB BASED)
+# =====================================
+
+@callback(
+    Output("dd-os-cluster", "options"),
+    Output("dd-os-cluster", "value"),
+    Output("dd-pfs-cluster", "options"),
+    Output("dd-pfs-cluster", "value"),
+    Input("tabs-survival-main", "active_tab"),
+    prevent_initial_call=True,
+)
+def populate_survival_clusters(active_tab):
+
+    if not CLUSTERS_INDEX:
+        return [], None, [], None
+
+    opts = list(CLUSTERS_INDEX)
+    default = opts[0]
+
+    return opts, default, opts, default
+
+
+
+@callback(
+    Output("os-survival-figure", "figure"),
+    Output("os-survival-stat", "figure"),
+    Input("dd-os-cluster", "value"),
+)
+def update_os_survival(cluster):
+
+    if DF_CLINICAL_DATA is None or cluster is None:
+        return no_update, no_update
+
+    if "OS_TIME" not in DF_CLINICAL_DATA.columns:
+        return no_update, no_update
+
+    if "OS_EVENT" not in DF_CLINICAL_DATA.columns:
+        return no_update, no_update
+
+    df = DF_CLINICAL_DATA[
+        DF_CLINICAL_DATA["cluster"] == cluster
+    ].dropna(subset=["OS_TIME", "OS_EVENT"])
+
+    if len(df) < 2:
+        return no_update, no_update
+
+    kmf = KaplanMeierFitter()
+
+    kmf.fit(
+        df["OS_TIME"],
+        event_observed=df["OS_EVENT"],
+    )
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=kmf.survival_function_.index,
+            y=kmf.survival_function_.iloc[:, 0],
+            mode="lines",
+            line=dict(shape="hv", width=3),
+        )
+    )
+
+    fig.update_layout(
+        title=f"Overall Survival – Cluster {cluster}",
+        xaxis_title="Time",
+        yaxis_title="Survival probability",
+    )
+
+    fig_stat = func_single_plot(cluster, "OS_EVENT_string")
+
+    return fig, fig_stat
+
+@callback(
+    Output("pfs-survival-figure", "figure"),
+    Output("pfs-survival-stat", "figure"),
+    Input("dd-pfs-cluster", "value"),
+)
+def update_pfs_survival(cluster):
+
+    if DF_CLINICAL_DATA is None or cluster is None:
+        return no_update, no_update
+
+    if "PFS_TIME" not in DF_CLINICAL_DATA.columns:
+        return no_update, no_update
+
+    if "PFS_EVENT" not in DF_CLINICAL_DATA.columns:
+        return no_update, no_update
+
+    df = DF_CLINICAL_DATA[
+        DF_CLINICAL_DATA["cluster"] == cluster
+    ].dropna(subset=["PFS_TIME", "PFS_EVENT"])
+
+    if len(df) < 2:
+        return no_update, no_update
+
+    kmf = KaplanMeierFitter()
+
+    kmf.fit(
+        df["PFS_TIME"],
+        event_observed=df["PFS_EVENT"],
+    )
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=kmf.survival_function_.index,
+            y=kmf.survival_function_.iloc[:, 0],
+            mode="lines",
+            line=dict(shape="hv", width=3),
+        )
+    )
+
+    fig.update_layout(
+        title=f"PFS – Cluster {cluster}",
+        xaxis_title="Time",
+        yaxis_title="Survival probability",
+    )
+
+    fig_stat = func_single_plot(cluster, "PFS_EVENT_string")
+
+    return fig, fig_stat
 
 
 # CLUSTER COMPARISION
@@ -2383,6 +2717,25 @@ PAGE_CLUSTER_COMPARISION = [
         ],
     ),
 ]
+
+# INIT CLUSTER MULTI DROPDOWN
+@callback(
+    Output("dd-cluster-multi", "options"),
+    Output("dd-cluster-multi", "value"),
+    Input("url", "pathname"),
+)
+def populate_cluster_multi(pathname):
+
+    if pathname != "/cluster_comparision":
+        return no_update, no_update
+
+    if not CLUSTERS_INDEX:
+        return [], []
+
+    opts = ["ALL", *CLUSTERS_INDEX]
+
+    # default: first two
+    return opts, opts[:2]
 
 
 # UPDATE COMPARISION
