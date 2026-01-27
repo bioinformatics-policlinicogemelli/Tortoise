@@ -7,6 +7,52 @@ and this project follows semantic versioning principles.
 
 ---
 
+## Version: pre-survival-refactor-stable
+
+### Date: 2026-01-27
+
+### Added
+
+- Introduced structured survival handling with OS/PFS separation
+- Added parent Survival Analysis page with tab-based navigation
+- Added dedicated OS and PFS survival subpages
+- Added automatic migration from legacy clinical survival config
+- Added normalization and validation of survival event columns
+- Added creation of OS_EVENT_string and PFS_EVENT_string for legacy plots
+- Enabled suppress_callback_exceptions for dynamic multipage layout
+
+### Changed
+- Refactored routing for survival pages:
+  - /survival
+  - /survival/os
+  - /survival/pfs
+- Updated sidebar to support hierarchical survival navigation
+- Updated study loading pipeline to support multiple survival endpoints
+- Enforced numeric casting for survival time/event columns (lifelines compatibility)
+
+### Fixed
+
+- Fixed survival normalization producing object dtypes
+- Fixed lifelines crashes due to invalid event formats
+- Fixed broken cluster comparison callbacks
+- Fixed duplicated/invalid Dash callback registrations
+- Fixed routing conflicts between legacy and new survival pages
+- Restored functionality of Cluster Comparison page after routing refactor
+
+## Known Issues
+
+- OS and PFS survival pages currently render empty (UI lifecycle issue under investigation)
+- Survival subpage callbacks may not trigger on initial load
+- Survival visualization refactor not yet complete
+
+### Technical Notes
+
+- Survival data preparation centralized in prepare_survival_columns
+- Legacy survival fields migrated to config["survival"]
+- Tab state synchronized with URL routing
+- Global clinical dataframe updated at study selection time
+
+
 ## [Unreleased]
 
 ### Added
