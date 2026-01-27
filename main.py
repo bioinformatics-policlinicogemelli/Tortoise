@@ -610,9 +610,41 @@ def select_study(value) -> str:
                 survival_cfg,
             )
             CONTEXT_DATA["survival"].update(survival_info)
+
+            # ==================================================
+            # FORCE NUMERIC TYPES (CRITICAL FIX FOR LIFELINES)
+            # ==================================================
+
+            # OS
+            if "OS_TIME" in DF_CLINICAL_DATA.columns:
+                DF_CLINICAL_DATA["OS_TIME"] = pd.to_numeric(
+                    DF_CLINICAL_DATA["OS_TIME"],
+                    errors="coerce",
+                )
+
+            if "OS_EVENT" in DF_CLINICAL_DATA.columns:
+                DF_CLINICAL_DATA["OS_EVENT"] = pd.to_numeric(
+                    DF_CLINICAL_DATA["OS_EVENT"],
+                    errors="coerce",
+                )
+
+            # PFS
+            if "PFS_TIME" in DF_CLINICAL_DATA.columns:
+                DF_CLINICAL_DATA["PFS_TIME"] = pd.to_numeric(
+                    DF_CLINICAL_DATA["PFS_TIME"],
+                    errors="coerce",
+                )
+
+            if "PFS_EVENT" in DF_CLINICAL_DATA.columns:
+                DF_CLINICAL_DATA["PFS_EVENT"] = pd.to_numeric(
+                    DF_CLINICAL_DATA["PFS_EVENT"],
+                    errors="coerce",
+                )
+
         except Exception as e:
             print("[WARNING] Survival preparation failed")
             print(e)
+
 
     # --------------------------------------------------
     # ADD "ALL" CLUSTER
@@ -963,22 +995,33 @@ def update_list_columns_patient_name(loaded, sep, skip, filename):
     Input("clinical-patient-file", "isCompleted"),
     Input("clinical-patient-separator", "value"),
     Input("clinical-patient-skiprow", "value"),
+    Input("radio-survival-availability", "value"),  # <-- FIX
     State("clinical-patient-file", "fileNames"),
 )
-def populate_pfs_columns(loaded, sep, skip, filename):
+def populate_pfs_columns(loaded, sep, skip, survival_mode, filename):
+
+    # Only when PFS is enabled
+    if survival_mode != "os_pfs":
+        return [], []
+
     if not loaded or sep is None or skip is None or not filename:
         return [], []
 
-    df = pd.read_csv(
-        Path("temp", filename[0]),
-        sep=sep,
-        skiprows=skip,
-        engine="python",
-        nrows=0,
-    )
+    try:
+        df = pd.read_csv(
+            Path("temp", filename[0]),
+            sep=sep,
+            skiprows=skip,
+            engine="python",
+            nrows=0,
+        )
+    except Exception as e:
+        print("[ERROR] PFS column read failed:", e)
+        return [], []
 
     cols = df.columns.tolist()
     return cols, cols
+
 
 # dropdown column sample name
 @callback(

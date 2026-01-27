@@ -217,7 +217,8 @@ def normalize_survival_event(series: pd.Series) -> pd.Series:
     event_values = {
         "1", "yes", "y", "true",
         "dead", "death", "deceased",
-        "progress", "progressed", "progression", "relapse", "event",
+        "progress", "progressed", "progression",
+        "relapse", "event",
     }
 
     censored_values = {
@@ -226,39 +227,69 @@ def normalize_survival_event(series: pd.Series) -> pd.Series:
     }
 
     def _normalize_value(val):
+
+        # ----------------------
+        # NULL
+        # ----------------------
         if pd.isna(val):
             return np.nan
 
-        # numeric values
+        # ----------------------
+        # REAL NUMBERS
+        # ----------------------
         if isinstance(val, (int, float)):
+
+            if np.isnan(val):
+                return np.nan
+
             if val == 1:
                 return 1.0
+
             if val == 0:
                 return 0.0
+
             return np.nan
 
-        # string normalization
+        # ----------------------
+        # STRING
+        # ----------------------
         s = str(val).strip().lower()
 
         if not s:
             return np.nan
 
-        # replace separators with spaces (":", ";", "-", etc.)
+        # Try direct numeric conversion first
+        try:
+            f = float(s)
+
+            if f == 1.0:
+                return 1.0
+
+            if f == 0.0:
+                return 0.0
+
+        except Exception:
+            pass
+
+        # Replace punctuation with spaces
         s = re.sub(r"[^\w]+", " ", s)
 
         tokens = s.split()
 
-        # event if ANY token indicates event
+        # Event if ANY token matches
         if any(tok in event_values for tok in tokens):
             return 1.0
 
-        # censored if ANY token indicates censoring
+        # Censored if ANY token matches
         if any(tok in censored_values for tok in tokens):
             return 0.0
 
         return np.nan
 
-    return series.apply(_normalize_value)
+    # Apply + FORCE FLOAT dtype
+    out = series.apply(_normalize_value)
+
+    return out.astype("float64")
 
 # ===========================
 # READ AND SET SURVIVAL EVENT
