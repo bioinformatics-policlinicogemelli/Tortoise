@@ -71,6 +71,9 @@ import igraph as ig
 import numpy as np
 import pandas as pd
 from rpy2 import robjects
+from pathlib import Path
+import matplotlib.pyplot as plt
+from lifelines.statistics import multivariate_logrank_test
 
 # ============================================================
 # MULTI-RESOLUTION CLUSTERING (ADD-ON, NON USATO DI DEFAULT)
@@ -1491,3 +1494,269 @@ def sankey_gene_centroid_flow(
     fig.write_html(out_path)
 
     print(f"[DONE] Sankey plot saved to {out_path}")
+
+
+# ==================================================
+# MULTI-RESOLUTION SURVIVAL ANALYSIS
+# ==================================================
+
+def resolution_survival_analysis(
+    path_save,
+    df_clinical,
+    survival_info,
+):
+    """
+    Multi-resolution survival analysis using Resolution Survival Score (RSS v1).
+
+    Uses SAMPLE_ID column to match patients between:
+    - resolution_centroids.tsv
+    - cluster_clinical_data.csv
+
+    Output structure:
+        output/
+        └── resolution_survival/
+            ├── os/
+            │   ├── min_patients/
+            │   │   ├── resolution_survival_scores.tsv
+            │   │   ├── resolution_survival_curve.png
+            │   │   └── best_resolution.info
+            │   └── min_events/
+            └── pfs/
+                └── ...
+    """
+
+    
+
+    path_save = Path(path_save)
+
+    # --------------------------------------------------
+    # Load resolution centroids
+    # --------------------------------------------------
+    centroids_path = path_save / "resolution_centroids.tsv"
+    if not centroids_path.exists():
+        print("[WARNING] resolution_centroids.tsv not found. Skipping survival analysis.")
+        return
+
+    df_centroids = pd.read_csv(centroids_path, sep="\t")
+
+    # --------------------------------------------------
+    # Build resolution -> cluster -> samples map
+    # --------------------------------------------------
+    res_map = {}
+
+    for col in df_centroids.columns:
+        # Format: GENE[-GENE]_clusterX_RES
+        left, _, res = col.rpartition("_")
+        try:
+            res = float(res)
+        except ValueError:
+            continue
+
+        cluster_id = left.split("_cluster")[-1]
+
+        samples = set(
+            s for s in df_centroids[col].dropna().astype(str) if s != ""
+        )
+
+        if samples:
+            res_map.setdefault(res, {}).setdefault(cluster_id, set()).update(samples)
+
+    if not res_map:
+        print("[WARNING] No resolution data parsed. Skipping survival analysis.")
+        return
+
+    # --------------------------------------------------
+    # Check SAMPLE_ID column
+    # --------------------------------------------------
+    if "SAMPLE_ID" not in df_clinical.columns:
+        raise ValueError("SAMPLE_ID column not found in clinical data")
+
+    # --------------------------------------------------
+    # Endpoint loop (OS / PFS)
+    # --------------------------------------------------
+    for endpoint in ("os", "pfs"):
+
+        if not survival_info.get(f"{endpoint}_available", False):
+            continue
+
+        time_col = f"{endpoint.upper()}_TIME"
+        event_col = f"{endpoint.upper()}_EVENT"
+
+        df_surv = df_clinical[["SAMPLE_ID", time_col, event_col]].copy()
+        df_surv = df_surv.dropna()
+
+        if df_surv.empty:
+            continue
+
+        total_patients = df_surv.shape[0]
+        total_events = int(df_surv[event_col].sum())
+
+        # --------------------------------------------------
+        # Robustness criteria loop
+        # --------------------------------------------------
+        for criterion in ("min_patients", "min_events"):
+
+            out_dir = (
+                path_save
+                / "resolution_survival"
+                / endpoint
+                / criterion
+            )
+            out_dir.mkdir(parents=True, exist_ok=True)
+
+            records = []
+
+            # ----------------------------------------------
+            # Resolution loop
+            # ----------------------------------------------
+            for res, clusters in sorted(res_map.items()):
+
+                cluster_masks = {}
+                cluster_sizes = {}
+                cluster_events = {}
+
+                sample_series = df_surv["SAMPLE_ID"].astype(str)
+
+                for cid, samples in clusters.items():
+                    valid_samples = samples & set(sample_series)
+
+                    if not valid_samples:
+                        continue
+
+                    mask = sample_series.isin(valid_samples)
+                    size = int(mask.sum())
+                    events = int(df_surv.loc[mask, event_col].sum())
+
+                    cluster_masks[cid] = mask
+                    cluster_sizes[cid] = size
+                    cluster_events[cid] = events
+
+                # ------------------------------------------
+                # Apply robustness criterion
+                # ------------------------------------------
+                if criterion == "min_patients":
+                    min_required = max(10, int(0.05 * total_patients))
+                    valid_clusters = [
+                        cid for cid, sz in cluster_sizes.items()
+                        if sz >= min_required
+                    ]
+                else:  # min_events
+                    min_required = 5
+                    valid_clusters = [
+                        cid for cid, ev in cluster_events.items()
+                        if ev >= min_required
+                    ]
+
+                if len(valid_clusters) < 2:
+                    continue
+
+                # ------------------------------------------
+                # Build group labels
+                # ------------------------------------------
+                groups = np.full(df_surv.shape[0], -1)
+
+                for i, cid in enumerate(valid_clusters):
+                    groups[cluster_masks[cid]] = i
+
+                mask_valid = groups >= 0
+
+                if mask_valid.sum() < 2:
+                    continue
+
+                T = df_surv.loc[mask_valid, time_col]
+                E = df_surv.loc[mask_valid, event_col]
+                G = groups[mask_valid]
+
+                # ------------------------------------------
+                # Log-rank test
+                # ------------------------------------------
+                try:
+                    lr = multivariate_logrank_test(T, G, E)
+                    p_value = float(lr.p_value)
+                except Exception:
+                    continue
+
+                if not np.isfinite(p_value) or p_value <= 0:
+                    continue
+
+                # ------------------------------------------
+                # Robustness term
+                # ------------------------------------------
+                if criterion == "min_patients":
+                    min_cluster = min(cluster_sizes[cid] for cid in valid_clusters)
+                    robustness = min_cluster / total_patients
+                else:
+                    min_cluster = min(cluster_events[cid] for cid in valid_clusters)
+                    robustness = (
+                        min_cluster / total_events if total_events > 0 else 0
+                    )
+
+                # ------------------------------------------
+                # RSS v1 score
+                # ------------------------------------------
+                score = -np.log10(p_value) * robustness
+
+                records.append(
+                    {
+                        "resolution": res,
+                        "n_clusters": len(valid_clusters),
+                        "n_patients": int(mask_valid.sum()),
+                        "min_cluster": int(min_cluster),
+                        "logrank_p": p_value,
+                        "score": score,
+                    }
+                )
+
+            if not records:
+                print(
+                    f"[INFO] No valid resolutions for "
+                    f"{endpoint.upper()} / {criterion}"
+                )
+                continue
+
+            # --------------------------------------------------
+            # Save TSV
+            # --------------------------------------------------
+            df_scores = (
+                pd.DataFrame(records)
+                .sort_values("score", ascending=False)
+            )
+
+            tsv_path = out_dir / "resolution_survival_scores.tsv"
+            df_scores.to_csv(tsv_path, sep="\t", index=False)
+
+            # --------------------------------------------------
+            # Best resolution
+            # --------------------------------------------------
+            best_res = df_scores.iloc[0]["resolution"]
+            with open(out_dir / "best_resolution.info", "w") as f:
+                f.write(str(best_res))
+
+            # --------------------------------------------------
+            # Plot score vs resolution
+            # --------------------------------------------------
+            plt.figure(figsize=(6, 4))
+            plt.plot(
+                df_scores["resolution"],
+                df_scores["score"],
+                marker="o",
+            )
+            plt.axvline(
+                best_res,
+                linestyle="--",
+            )
+            plt.xlabel("Resolution")
+            plt.ylabel("RSS score")
+            plt.title(
+                f"Survival score vs resolution "
+                f"({endpoint.upper()}, {criterion})"
+            )
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(out_dir / "resolution_survival_curve.png", dpi=300)
+            plt.close()
+
+            print(
+                f"[DONE] Survival analysis completed: "
+                f"{endpoint.upper()} / {criterion}"
+            )
