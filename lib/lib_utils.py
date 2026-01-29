@@ -315,7 +315,7 @@ def prepare_survival_columns(df_clinical: pd.DataFrame, survival_cfg: dict):
             "pfs_available": bool
         }
     """
-
+    
     df = df_clinical.copy()
 
     survival_info = {
@@ -1503,7 +1503,6 @@ def sankey_gene_centroid_flow(
 def resolution_survival_analysis(
     path_save,
     df_clinical,
-    survival_info,
 ):
     """
     Multi-resolution survival analysis using Resolution Survival Score (RSS v1).
@@ -1572,12 +1571,27 @@ def resolution_survival_analysis(
         raise ValueError("SAMPLE_ID column not found in clinical data")
 
     # --------------------------------------------------
-    # Endpoint loop (OS / PFS)
+    # Detect available endpoints directly from columns
     # --------------------------------------------------
-    for endpoint in ("os", "pfs"):
+    endpoints = []
 
-        if not survival_info.get(f"{endpoint}_available", False):
-            continue
+    if {"OS_TIME", "OS_EVENT"}.issubset(df_clinical.columns):
+        endpoints.append("os")
+
+    if {"PFS_TIME", "PFS_EVENT"}.issubset(df_clinical.columns):
+        endpoints.append("pfs")
+
+    if not endpoints:
+        print("[WARNING] No OS/PFS columns found. Skipping survival analysis.")
+        return
+
+    print(f"[INFO] Endpoints detected: {endpoints}")
+
+    # --------------------------------------------------
+    # Endpoint loop
+    # --------------------------------------------------
+    for endpoint in endpoints:
+
 
         time_col = f"{endpoint.upper()}_TIME"
         event_col = f"{endpoint.upper()}_EVENT"

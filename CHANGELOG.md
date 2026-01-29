@@ -7,6 +7,31 @@ and this project follows semantic versioning principles.
 
 ---
 
+## Version: feature/resolution-survival-optimization
+
+### Date 2026-01-29
+
+Wire resolution survival analysis into Dash UI
+
+- Run resolution_survival_analysis on study selection
+- Generate survival-based resolution outputs automatically
+- Add Resolution → Survival page to Dash
+- Display survival ranking table and score curve
+- Add-only changes, no breaking modifications
+
+### Date 2026-01-28
+
+
+Add multi-resolution survival analysis with RSS v1
+
+- Implement survival-based resolution selection (OS, PFS)
+- Support robustness criteria: min_patients and min_events
+- Compute Resolution Survival Score (RSS v1)
+- Write survival rankings, plots, and best resolution per endpoint
+- Add-only change, no impact on existing pipeline
+
+
+
 ## Version: pre-survival-refactor-stable
 
 ### Date: 2026-01-27

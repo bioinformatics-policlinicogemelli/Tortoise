@@ -324,6 +324,15 @@ SIDEBAR = html.Div(
                     href="/resolution/sankey",
                     className="ms-3",
                 ),
+                dbc.NavLink(
+                    [
+                        html.I(className="fas fa-heartbeat"),
+                        html.Span("  └ Survival"),
+                    ],
+                    href="/resolution/survival",
+                    className="ms-3",
+                ),
+
 
             ],
             vertical=True,
@@ -505,6 +514,8 @@ def redirect_pages(pathname):
 
     elif pathname == "/resolution/sankey":
         selected_page = PAGE_RESOLUTION_SANKEY
+    elif pathname == "/resolution/survival":
+        selected_page = PAGE_RESOLUTION_SURVIVAL
 
 
 
@@ -742,6 +753,22 @@ def select_study(value) -> str:
 
     with CONTEXT_DATA["out_root_path"].joinpath("seed.info").open() as f:
         CONTEXT_DATA["stats"]["seed"] = f.readline().strip()
+
+    # --------------------------------------------------
+    # RUN RESOLUTION SURVIVAL ANALYSIS (ADD-ONLY)
+    # --------------------------------------------------
+    try:
+        from lib.lib_utils import resolution_survival_analysis
+
+        resolution_survival_analysis(
+            path_save=CONTEXT_DATA["out_root_path"],
+            df_clinical=DF_CLINICAL_DATA,
+        )
+
+    except Exception as e:
+        print("[WARNING] Resolution survival analysis failed")
+        print(e)
+
 
     return (
         f"Study {value}",
@@ -2999,6 +3026,33 @@ PAGE_RESOLUTION_SANKEY = html.Div(
     ]
 )
 
+PAGE_RESOLUTION_SURVIVAL = html.Div(
+    [
+        html.H2("Resolution Survival Analysis"),
+
+        html.Hr(),
+
+        html.Div(
+            id="resolution-survival-info",
+            className="alert alert-secondary",
+        ),
+
+        html.Hr(),
+
+        html.H4("Resolution ranking"),
+        html.Div(id="resolution-survival-table"),
+
+        html.Hr(),
+
+        html.H4("Score vs resolution"),
+        html.Img(
+            id="resolution-survival-curve",
+            style={"maxWidth": "100%", "height": "auto"},
+        ),
+    ]
+)
+
+
 @callback(
     Output("best-resolution-text", "children"),
     Output("resolution-gene-curve", "src"),
@@ -3094,6 +3148,57 @@ def update_sankey_page(_):
         return "<p>Sankey plot not available.</p>"
 
     return sankey_path.read_text()
+
+@callback(
+    Output("resolution-survival-info", "children"),
+    Output("resolution-survival-table", "children"),
+    Output("resolution-survival-curve", "src"),
+    Input("url", "pathname"),
+)
+def update_resolution_survival_page(pathname):
+
+    if pathname != "/resolution/survival":
+        return no_update, no_update, no_update
+
+    if CONTEXT_DATA["out_root_path"] is None:
+        return "No study selected.", None, None
+
+    base = (
+        Path(CONTEXT_DATA["out_root_path"])
+        / "resolution_survival"
+        / "pfs"
+        / "min_patients"
+    )
+
+    tsv_path = base / "resolution_survival_scores.tsv"
+    curve_path = base / "resolution_survival_curve.png"
+    best_path = base / "best_resolution.info"
+
+    if not tsv_path.exists():
+        return (
+            "Resolution survival analysis not available.",
+            None,
+            None,
+        )
+
+    # --- info text
+    best_res = best_path.read_text().strip() if best_path.exists() else "N/A"
+    info = f"PFS / min_patients — Best resolution: {best_res}"
+
+    # --- table
+    df = pd.read_csv(tsv_path, sep="\t")
+    table = dbc.Table.from_dataframe(
+        df.round(4),
+        striped=True,
+        bordered=True,
+        hover=True,
+        responsive=True,
+    )
+
+    # --- curve
+    curve_img = load_png_as_base64(curve_path)
+
+    return info, table, curve_img
 
 
 # START
