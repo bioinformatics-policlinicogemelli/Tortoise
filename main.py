@@ -3163,27 +3163,35 @@ def update_resolution_survival_page(pathname):
     if CONTEXT_DATA["out_root_path"] is None:
         return "No study selected.", None, None
 
-    base = (
-        Path(CONTEXT_DATA["out_root_path"])
-        / "resolution_survival"
-        / "pfs"
-        / "min_patients"
-    )
+    root = Path(CONTEXT_DATA["out_root_path"]) / "resolution_survival"
+
+    if not root.exists():
+        return "Resolution survival analysis not available.", None, None
+
+    base = None
+    selected = None
+
+    # priority order: PFS first, then OS
+    for endpoint in ["pfs", "os"]:
+        for criterion in ["min_patients", "min_events"]:
+            candidate = root / endpoint / criterion / "resolution_survival_scores.tsv"
+            if candidate.exists():
+                base = candidate.parent
+                selected = f"{endpoint.upper()} / {criterion}"
+                break
+        if base is not None:
+            break
+
+    if base is None:
+        return "Resolution survival analysis not available.", None, None
 
     tsv_path = base / "resolution_survival_scores.tsv"
     curve_path = base / "resolution_survival_curve.png"
     best_path = base / "best_resolution.info"
 
-    if not tsv_path.exists():
-        return (
-            "Resolution survival analysis not available.",
-            None,
-            None,
-        )
-
     # --- info text
     best_res = best_path.read_text().strip() if best_path.exists() else "N/A"
-    info = f"PFS / min_patients — Best resolution: {best_res}"
+    info = f"{selected} — Best resolution: {best_res}"
 
     # --- table
     df = pd.read_csv(tsv_path, sep="\t")
@@ -3199,6 +3207,7 @@ def update_resolution_survival_page(pathname):
     curve_img = load_png_as_base64(curve_path)
 
     return info, table, curve_img
+
 
 
 # START
