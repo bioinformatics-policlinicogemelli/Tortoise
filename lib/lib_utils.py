@@ -70,6 +70,7 @@ from pathlib import Path
 import igraph as ig
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 from rpy2 import robjects
 
 def load_df(config):
@@ -98,6 +99,12 @@ def load_df(config):
                     "data_clinical_patient_sep": str,
                     # Number of rows to skip in the clinical patient data CSV file
                     "data_clinical_patient_skip": int,
+                    # Path to the CNV data CSV file (optional)
+                    "data_cnv": str,
+                    # Separator for the CNV data CSV file
+                    "data_cnv_sep": str,
+                    # Number of rows to skip in the CNV data CSV file
+                    "data_cnv_skip": int,
                 }
             }
 
@@ -110,12 +117,14 @@ def load_df(config):
             or None if not provided.
 
     """
+    # MUTATIONAL DATA
     df_mut = pd.read_csv(
         config["paths"]["data_mutational"],
         sep=config["paths"]["data_mutational_sep"],
         skiprows=config["paths"]["data_mutational_skip"],
         low_memory=False,
     )
+    # CLINICAL DATA
     data_clinical_sample = None
     if config["paths"]["data_clinical_sample"] != "":
         data_clinical_sample = pd.read_csv(
@@ -124,6 +133,7 @@ def load_df(config):
             skiprows=config["paths"]["data_clinical_sample_skip"],
             low_memory=False,
         )
+    # CLINICAL PATIENT DATA 
     data_clinical_patient = None
     if config["paths"]["data_clinical_patient"] != "":
         data_clinical_patient = pd.read_csv(
@@ -132,7 +142,19 @@ def load_df(config):
             skiprows=config["paths"]["data_clinical_patient_skip"],
             low_memory=False,
         )
-    return df_mut, data_clinical_sample, data_clinical_patient
+    # CNV DATA 
+    data_cnv = None
+    data_cnv_path = config["paths"].get("data_cnv", "")
+    if data_cnv_path != "":
+        data_cnv_sep = config["paths"].get("data_cnv_sep", "\t")
+        data_cnv_skip = config["paths"].get("data_cnv_skip", 0)
+        data_cnv = pd.read_csv(
+            data_cnv_path,
+            sep=data_cnv_sep,
+            skiprows=data_cnv_skip,
+            low_memory=False,
+        )
+    return df_mut, data_clinical_sample, data_clinical_patient, data_cnv
 
 
 def filter_vaf(config, df_mut):
@@ -184,7 +206,8 @@ def enrichment_with_r(path_save, map_cluster) -> None:
     """Perform enrichment analysis using an R script for given gene clusters.
 
     This function loads an R script and uses it to perform enrichment analysis
-    on gene clusters. The results are saved in specified directories.
+    on gene clusters separated by event type (MUT, CNV_GAIN, CNV_LOSS).
+    The results are saved in specified directories organized by event type.
 
     Args:
         path_save (str): The path where the results will be saved.
@@ -201,32 +224,34 @@ def enrichment_with_r(path_save, map_cluster) -> None:
     r_func = robjects.globalenv["all_analisi"]
     g_path = Path(path_save, "gene_cluster_list")
     o_path = Path(path_save, "pathway_analysis")
-    Path(o_path, "GO").mkdir(parents=True, exist_ok=True)
-    Path(o_path, "KEGG").mkdir(parents=True, exist_ok=True)
-    Path(o_path, "WIKI").mkdir(parents=True, exist_ok=True)
-    Path(o_path, "REACTOME").mkdir(parents=True, exist_ok=True)
-    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
-        with Pool() as p:
-            p.map(
-                r_func,
-                [
-                    [
-                        str(g_path.joinpath(f"genes_cluster_{c}.csv")),
-                        c,
-                        str(o_path),
-                    ]
-                    for c in map_cluster
-                ],
-            )
-    else:
+    
+    # Event types to process
+    event_types = ["MUT", "CNV_GAIN", "CNV_LOSS"]
+    
+    # Create base pathway_analysis directory
+    o_path.mkdir(parents=True, exist_ok=True)
+    
+    # Prepare list of parameters for enrichment analysis
+    params_list = []
+    for event_type in event_types:
         for c in map_cluster:
-            r_func(
-                [
-                    str(g_path.joinpath(f"genes_cluster_{c}.csv")),
+            gene_file = g_path.joinpath(f"genes_cluster_{c}_{event_type}.csv")
+            # Only add if gene file exists and has content
+            if gene_file.exists() and gene_file.stat().st_size > 0:
+                params_list.append([
+                    str(gene_file),
                     c,
                     str(o_path),
-                ],
-            )
+                    event_type,
+                ])
+    
+    # Run enrichment analysis in parallel or sequential
+    if sys.platform.startswith("win") or sys.platform.startswith("linux"):
+        with Pool() as p:
+            p.map(r_func, params_list)
+    else:
+        for params in params_list:
+            r_func(params)
 
 
 def adding_category_mutation(data_mutational, list_columns):
@@ -248,7 +273,7 @@ def adding_category_mutation(data_mutational, list_columns):
     return data_mutational
 
 
-# funzione per cacolare, se assente, la colonna della VAF
+# funzione per calcolare, se assente, la colonna della VAF
 def calculated_vaf(riga):
     if riga["t_alt_count"] is np.nan or riga["t_ref_count"] is np.nan:
         return np.nan
@@ -256,6 +281,50 @@ def calculated_vaf(riga):
         return 0
     return riga["t_alt_count"] / (riga["t_alt_count"] + riga["t_ref_count"])
 
+# Preprocessing CNV data
+def preprocess_cnv(data_cnv, column_cnv_gene=None):
+    """
+    Preprocessing CNV data:
+      - Identify gene column
+      - Set gene index
+      - Keep patient columns
+      - Convert CNV numeric values into Gain/Loss categories:
+            -2 → "Loss"
+             2 → "Gain"
+             1, -1, 0, NaN → removed (kept as NaN)
+      - Returns categorical CNV dataframe ready for mapping
+    """
+
+    d_cnv = data_cnv.copy()
+
+    # 1. Gene column
+    if column_cnv_gene is not None:
+        gene_col = column_cnv_gene
+    elif "Hugo_Symbol" in d_cnv.columns:
+        gene_col = "Hugo_Symbol"
+    else:
+        gene_col = d_cnv.columns[0]
+
+    # 2. Set index on gene
+    d_cnv = d_cnv.set_index(gene_col)
+
+    # 3. Patient columns (all except gene column)
+    patient_cols = [col for col in d_cnv.columns if col != gene_col]
+    d_cnv = d_cnv[patient_cols]
+
+    # 4. Convert to numeric safely
+    d_cnv = d_cnv.apply(pd.to_numeric, errors="coerce")
+
+    # 5. Convert CNV values → categories
+    d_cnv = d_cnv.replace({
+        -2: "Loss",
+        -1: np.nan, # -1 does not interest us
+         1: np.nan, # 1 does not interest us
+         2: "Gain",
+         0: np.nan   # 0 does not interest us
+    })
+
+    return d_cnv
 
 def create_maps(
     data_mutational,
@@ -275,26 +344,62 @@ def create_maps(
 
         # se questa colonna è vuota tornerà una stringa vuota
         if "HGVSp_Short" in data_mutational.columns:
-            _sost_amm = str(_row["HGVSp_Short"])
+            _label = str(_row["HGVSp_Short"])
         else:
-            _sost_amm = ""
+            _label = ""
         _vaf = float(_row[column_vaf]) if vaf_score else ""
 
         # creazione dizionario delle varianti
         if _category not in map_variants:
-            map_variants[_category] = {}
-            map_variants[_category]["patients"] = set()
-            map_variants[_category]["sost_amm"] = _sost_amm
-            map_variants[_category]["gene"] = _gene
-            map_variants[_category]["vaf"] = _vaf
-
+            map_variants[_category] = {
+                "patients": set(),
+                "event_type": "MUT",
+                "gene": _gene,
+                "label": _label, 
+                "vaf": _vaf,
+            }
         map_variants[_category]["patients"].add(_paz)
 
         # creazione dizionario dei pazienti
         if _paz not in map_patients:
-            map_patients[_paz] = {}
-            map_patients[_paz]["variants"] = set()
+            map_patients[_paz] = {"variants": set()}
+
         map_patients[_paz]["variants"].add(_category)
+
+    return map_patients, map_variants
+
+#Add CNV events as VARIANT nodes.
+#Safe to skip entirely if CNV are not used.
+def add_cnv_to_maps(d_cnv, map_patients, map_variants):
+
+    for gene, row in d_cnv.iterrows():
+        for patient, state in row.items():
+
+            if pd.isna(state):
+                continue
+
+            patient = str(patient)
+            gene = str(gene)
+            state = str(state)
+
+            variant_id = f"{gene}_{state}"
+
+            if variant_id not in map_variants:
+                map_variants[variant_id] = {
+                    "patients": set(),
+                    "event_type": "CNV",
+                    "cnv_direction": state, # Gain or Loss
+                    "gene": gene,
+                    "label": state,
+                    "vaf": "",
+                }
+
+            map_variants[variant_id]["patients"].add(patient)
+
+            if patient not in map_patients:
+                map_patients[patient] = {"variants": set()}
+
+            map_patients[patient]["variants"].add(variant_id)
 
     return map_patients, map_variants
 
@@ -313,12 +418,12 @@ def graph_creation(map_patients, map_variants):
         list(map_variants.keys()),
         attributes={
             "vertex_type": "VARIANT",
+            "event_type": [v.get("event_type", "MUT") for v in map_variants.values()], 
+            "cnv_direction": [v.get("cnv_direction", "") for v in map_variants.values()],
+            "gene":       [v.get("gene", "") for v in map_variants.values()],
+            "label":      [v.get("label", "") for v in map_variants.values()],
             "color_vertex": "blue",
             "shape_vertex": "circle",
-            "gene": [f"{value['gene']}" for value in map_variants.values()],
-            "sost_amm": [
-                f"{value['sost_amm']}" for value in map_variants.values()
-            ],
         },
     )
     graph.add_vertices(
@@ -345,6 +450,63 @@ def count_gene(graph):
         sorted(gene_total_count.items(), key=lambda kv: kv[1], reverse=True),
     )
 
+# count genes by event type
+def count_gene_by_event_type(graph, cluster = None):
+    gene_event_count = {}
+
+    for v in graph.vs:
+        if v["vertex_type"] != "VARIANT":
+            continue
+        if cluster is not None and v["cluster"] != cluster:
+            continue
+        
+        try:
+            gene = v["gene"]
+        except KeyError:
+            gene = ""
+        
+        try:
+            event_type = v["event_type"]
+        except KeyError:
+            event_type = "MUT"
+
+        if not gene:
+            continue
+
+        if gene not in gene_event_count:
+            gene_event_count[gene] = {
+                "MUT": 0,
+                "CNV_GAIN": 0,
+                "CNV_LOSS": 0,
+                "TOTAL": 0,
+            }
+        
+        if event_type == "MUT":
+            gene_event_count[gene]["MUT"] += 1
+        elif event_type == "CNV":
+            try:
+                cnv_dir = v["cnv_direction"]
+            except KeyError:
+                cnv_dir = ""
+            if cnv_dir == "Gain":
+                gene_event_count[gene]["CNV_GAIN"] += 1
+            elif cnv_dir == "Loss":
+                gene_event_count[gene]["CNV_LOSS"] += 1
+
+        gene_event_count[gene]["TOTAL"] += 1
+
+    return gene_event_count
+
+# write file with gene counts by event type
+def save_gene_event_summary(graph, path_save):
+    gene_event_count = count_gene_by_event_type(graph)
+    with Path(path_save, "gene_event_summary.csv").open(
+        "w",
+        encoding="utf-8",
+    ) as f:
+        f.write("GENE,MUT,CNV_GAIN,CNV_LOSS,TOTAL\n")
+        for gene, counts in gene_event_count.items():
+            f.write(f"{gene},{counts['MUT']},{counts['CNV_GAIN']},{counts['CNV_LOSS']},{counts['TOTAL']}\n")
 
 def process_data(args):
     _graph = args[0]
@@ -647,21 +809,84 @@ def count_gene_abs_percent(g, map_cluster, gene_total_count, path_save):
     return map_cluster_gene, map_cluster_percent
 
 
+# Extract genes from a given cluster filtered by event type and (optionally) CNV direction.
+def genes_by_event(cluster, g, event_type, direction=None):
+    genes = set()
+    for v in g.vs:
+        if v["cluster"] != cluster:
+            continue
+        if v["vertex_type"] != "VARIANT":
+            continue
+        if v["event_type"] != event_type:
+            continue
+        if direction is not None:
+            try:
+                cnv_dir = v["cnv_direction"]
+            except KeyError:
+                cnv_dir = ""
+            if cnv_dir != direction:
+                continue
+        genes.add(v["gene"])
+    return genes
+
+
 # creazione di un file per ogni cluster, contenente i geni presenti
 def genes_single_cluster(g, map_cluster, path_save) -> None:
     Path(path_save, "gene_cluster_list").mkdir(parents=True, exist_ok=True)
+
     for cluster in map_cluster:
-        with Path(path_save, "gene_cluster_list", f"genes_cluster_{cluster}.csv").open(
+        genes_mut = genes_by_event(cluster, g, "MUT")
+        genes_gain = genes_by_event(cluster, g, "CNV", "Gain")
+        genes_loss = genes_by_event(cluster, g, "CNV", "Loss")
+
+        # MUT
+        with Path(
+            path_save,
+            "gene_cluster_list",
+            f"genes_cluster_{cluster}_MUT.csv",
+        ).open(
             "w",
             encoding="utf-8",
         ) as f:
-            set_gene = {
-                v["gene"]
-                for v in g.vs
-                if v["cluster"] == cluster and v["vertex_type"] == "VARIANT"
-            }
-            for genes in set_gene:
-                f.write(genes + "\n")
+            for gene in genes_mut:
+                f.write(gene + "\n")
+
+        # CNV GAIN
+        with Path(
+            path_save,
+            "gene_cluster_list",
+            f"genes_cluster_{cluster}_CNV_GAIN.csv",
+        ).open(
+            "w",
+            encoding="utf-8",
+        ) as f:
+            for gene in genes_gain:
+                f.write(gene + "\n")
+
+        # CNV LOSS
+        with Path(
+            path_save,
+            "gene_cluster_list",
+            f"genes_cluster_{cluster}_CNV_LOSS.csv",
+        ).open(
+            "w",
+            encoding="utf-8",
+        ) as f:
+            for gene in genes_loss:
+                f.write(gene + "\n")
+
+        # Consolidated file with all genes (for enrichment analysis)
+        all_genes = genes_mut | genes_gain | genes_loss
+        with Path(
+            path_save,
+            "gene_cluster_list",
+            f"genes_cluster_{cluster}.csv",
+        ).open(
+            "w",
+            encoding="utf-8",
+        ) as f:
+            for gene in all_genes:
+                f.write(gene + "\n")
 
 
 # creazione di un file che per ogni cluster,
@@ -693,3 +918,46 @@ def cluster_noded_attributes(g, map_patient, map_variant):
         else:
             v["cluster"] = map_variant[v["name"]]["cluster"]
     return g
+
+# creation of CNV and Mutation figure by gene for a cluster
+def create_cnv_mutation_figure(graph, cluster):
+
+    if graph is None:
+        # Return empty figure if graph doesn't exist
+        fig = go.Figure()
+        fig.add_annotation(text="No graph data available")
+        return fig
+    
+    gene_event_count = count_gene_by_event_type(graph, cluster)
+    
+    if not gene_event_count:
+        # Return empty figure if no data
+        fig = go.Figure()
+        fig.add_annotation(text=f"No data available for cluster {cluster}")
+        return fig
+    
+    # Prepare data for stacked bar chart
+    genes = sorted(list(gene_event_count.keys()))
+    muts = [gene_event_count[g]["MUT"] for g in genes]
+    cnv_gains = [gene_event_count[g]["CNV_GAIN"] for g in genes]
+    cnv_losses = [gene_event_count[g]["CNV_LOSS"] for g in genes]
+    
+    # Create stacked bar chart using plotly
+    fig = go.Figure(data=[
+        go.Bar(name='Mutations', x=genes, y=muts, marker_color='#1f77b4'),
+        go.Bar(name='CNV Gain', x=genes, y=cnv_gains, marker_color='#ff7f0e'),
+        go.Bar(name='CNV Loss', x=genes, y=cnv_losses, marker_color='#d62728'),
+    ])
+    
+    fig.update_layout(
+        barmode='stack',
+        title=f'CNV and Mutations by Gene (Cluster {cluster})',
+        xaxis_title='Gene',
+        yaxis_title='Count',
+        hovermode='x unified',
+        height=500,
+        showlegend=True,
+        xaxis={'tickangle': -45} if len(genes) > 10 else {},
+    )
+    
+    return fig
