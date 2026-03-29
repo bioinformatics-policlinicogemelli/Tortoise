@@ -1,64 +1,62 @@
 #!/usr/bin/env python3
 """Dash web application for visualizing and analyzing data.
 
+
+
 The application includes multiple pages for different types of analysis,
 including study creation, study description, pathway analysis,
-clinical data visualization, survival analysis, and cluster comparison.
+clinical data visualization, survival analysis, cluster comparison,
+and CNV (Copy Number Variation) analysis.
 
-Modules:
-    - base64
-    - io
-    - json
-    - os
-    - dash_bootstrap_components as dbc
-    - dash_cytoscape as cyto
-    - matplotlib
-    - matplotlib.pyplot as plt
-    - numpy as np
-    - pandas as pd
-    - plotly.express as px
-    - plotly.graph_objects as go
-    - tap
-    - dash
-    - lifelines
-    - lifelines.statistics
-    - plotly.subplots
-    - lib.venn as venn
-Functions:
-    - filter_graph(cluster): Filters the graph based on the selected cluster.
-    - redirect_pages(pathname): Redirects to the page based on the URL.
-    - update_dropdown_liststudy(): Updates the dropdown list of studies.
-    - select_study(value): Selects a study and loads its data.
-    - update_mutational_file(filename): Updates mutational file component.
-    - update_clinical_patient_file(filename): Updates patient file component.
-    - update_clinical_sample_file(filename): Updates sample file component.
-    - update_val_col_patient_name(data, sep, skip): Updates dropdown options.
-    - update_val_col_sample_name(data, sep, skip): Updates dropdown options.
-    - update_list_columns_mutation(data, sep, skip): Updates dropdown options.
-    - create_study(...): Creates a new study based on the provided data.
-    - dropdpwn_cluster(): Updates the cluster dropdown options.
-    - display_node_data(data_dict): Displays data for the selected node.
-    - update_graph(layout): Updates the graph layout.
-    - update_cluster(cluster): Updates the cluster elements and figures.
-    - update_go(cluster, pvalue, adj_pvalue, p_type): Updates the GO plot.
-    - update_kegg(cluster, pvalue, adj_pvalue): Updates KEGG plot.
-    - update_reactome(cluster, pvalue, adj_pvalue): Updates REACTOME plot.
-    - update_wiki(cluster, pvalue, adj_pvalue): Updates WIKI plot.
-    - dropdown_box_fig_1(): Updates dropdown options.
-    - dropdown_box_fig_2(): Updates dropdown options.
-    - func_single_plot(cluster, col_name): Generates a single cluster plot.
-    - update_box_1(cluster, col_name): Updates the first box plot.
-    - update_box_2(cluster, col_name): Updates the second box plot.
-    - update_table_clinical_data(cluster): Updates the clinical data table.
-    - update_overall_survival(cluster): Updates survival plot and statistics.
-    - update_survival_comparison(list_clusters): Updates the survival plot.
-    - update_venn(list_clusters): Updates the Venn diagram for gene.
-    - update_genes_common(list_clusters): Updates the table of common genes.
-    - func_multi_plot(list_clusters, col_name): Generates multi-cluster plot.
-    - update_multi_fig(list_clusters, col_name): Updates multi-cluster plot.
-Usage:
-    Run this script to start the Dash web application.
-    The application will be available at http://127.0.0.1:8593.
+Features:
+    - Interactive network visualization using Cytoscape
+    - Mutation and CNV analysis with cluster visualization
+    - Clinical data integration and display
+    - Survival analysis with log-rank statistics
+    - Pathway enrichment analysis (GO, KEGG, REACTOME, WIKI)
+    - CNV events per patient visualization
+    - Venn diagram analysis for cluster comparison
+    - Multi-cluster comparison and visualization
+
+Key Functions:
+    - filter_graph(cluster, graph_type): Filters graph based on cluster and type
+    - redirect_pages(pathname): Routes to appropriate page based on URL
+    - select_study(value): Loads study data and initializes analysis
+    - update_cluster(cluster): Updates mutation cluster visualization
+    - update_cluster_cnv(cluster): Updates CNV cluster with patient event counts
+    - update_overall_survival(cluster): Generates survival curves
+    - update_survival_comparison(list_clusters): Compares survival across clusters
+    - update_venn(list_clusters): Generates Venn diagrams
+    - update_genes_common(list_clusters): Lists common genes across clusters
+    - update_go/update_kegg/update_reactome/update_wiki: Pathway enrichment plots
+    - func_single_plot/func_multi_plot: Clinical data box plots
+    - update_table_clinical_data: Displays clinical data tables
+    - generate_pathway_fig: Helper for pathway figure generation
+
+Data Upload Functions:
+    - create_study: Creates new study with uploaded data files
+    - update_list_columns_patient_name: Updates patient name dropdown
+    - update_list_columns_sample_name: Updates sample name dropdown
+    - update_list_columns_mutation: Updates mutation column dropdown
+    - update_list_columns_cnv_identifier: Updates CNV identifier dropdown
+    - confirm_study_prompt: Confirms and initializes study
+
+Node Display Functions:
+    - display_node_data: Shows details for selected mutation nodes
+    - display_node_data_cnv: Shows details for selected CNV nodes
+
+Dropdown/Selector Functions:
+    - update_dropdown_liststudy: Updates available studies list
+    - dropdpwn_cluster: Updates mutation cluster dropdown
+    - dropdown__cnv_cluster: Updates CNV cluster dropdown
+    - dropdpwn_multi_cluster: Updates multi-cluster selector
+    - dropdown_box_fig_1/dropdown_box_fig_2: Updates clinical variable dropdowns
+
+Utility Functions:
+    - count_unique_patients: Counts unique patients in filtered data
+    - update_graph: Updates graph layout for mutations
+    - update_graph_cnv: Updates graph layout for CNV
+    - update_box_1/update_box_2: Updates clinical data plots
 """
 
 import base64
@@ -106,9 +104,13 @@ DF_CLINICAL_DATA = None
 NUMERIC_COLUMNS_CLINICAL = []
 ALL_COLUMNS_CLINICAL = []
 GRAPH = None
+GRAPH_CNV = None
 CLUSTERS_INDEX = []
+CLUSTERS_CNV = []
 CLUSTER_SELECTED = None
+CLUSTER_SEL_CNV = None
 CLUSTER_SELECTED_MULTI = []
+CLUSTER_SEL_CNV_MULTI = []
 BOX_FIG_SELECTED_1 = None
 BOX_FIG_SELECTED_2 = None
 PATH_CONFIG = None
@@ -119,44 +121,62 @@ CONTEXT_DATA = {
     "name_study_input": None,
     "list_studies": [],
     "out_root_path": None,
-    "stats": {
-        "num_patient": 0,
-        "num_gene": 0,
-        "num_variant": 0,
-        "num_cluster": 0,
-        "modularity": 0,
+    "data": {
+        "stats_mut": {
+            "num_patient": 0,
+            "num_gene": 0,
+            "num_variant": 0,
+            "num_cluster": 0,
+            "modularity": 0,
+            "seed": 0,
+        },
+        "stats_cnv": None,
     },
 }
 
 
-def filter_graph(cluster):
-    if GRAPH is None:
+def filter_graph(cluster, graph_type="mut"):
+    graph = GRAPH if graph_type == "mut" else GRAPH_CNV
+
+    if graph is None:
         return []
-    list_vertices = GRAPH.vs.select(lambda x: x["cluster"] == cluster)
-    graph_filtered = GRAPH.induced_subgraph(list_vertices)
+
+    list_vertices = graph.vs.select(lambda v: v["cluster"] == cluster)
+    graph_filtered = graph.induced_subgraph(list_vertices)
+
     g_ele = []
-    # convert and add vertex
-    for e in graph_filtered.vs():
+
+    for e in graph_filtered.vs:
         _map = e.attributes()
         _map["id"] = e.index
         _map["variants"] = None
-        g_ele.append(
-            {
-                "data": _map,
-                "classes": e["vertex_type"],
-                "id": e.index,
-                "grabbable": False,
-            },
-        )
-    # convert and add edges
+
+        g_ele.append({
+            "data": _map,
+            "classes": e["vertex_type"],
+            "id": e.index,
+            "grabbable": False,
+        })
+
     g_ele.extend(
-        [
-            {"data": {"source": e.source, "target": e.target}}
-            for e in graph_filtered.es()
-        ],
+        {"data": {"source": e.source, "target": e.target}}
+        for e in graph_filtered.es
     )
     return g_ele
 
+def build_cnv_block():
+    cnv_stats = CONTEXT_DATA["data"]["stats_cnv"]
+    if cnv_stats is None:
+        return None
+
+    return html.Div([
+        html.H2("CNV summary"),
+        html.Div(f"Number of patients: {cnv_stats['num_patient']}"),
+        html.Div(f"Number of CNV events: {cnv_stats['num_cnv']}"),
+        html.Div(f"Number of clusters: {cnv_stats['num_cluster']}"),
+        html.Div(f"Cluster modularity: {cnv_stats['modularity']}"),
+        html.Div(f"Cluster seed: {cnv_stats['seed']}"),
+    ])
 
 # APP + SIDEBAR
 APP = Dash(
@@ -210,7 +230,7 @@ SIDEBAR = html.Div(
                     active="exact",
                     className="navbar_entity",
                 ),
-                # PATWAY
+                # PATHWAY
                 dbc.NavLink(
                     [
                         html.I(className="fas fa-diagram-project"),
@@ -256,6 +276,19 @@ SIDEBAR = html.Div(
                         ),
                     ],
                     href="/cluster_comparision",
+                    active="exact",
+                    className="navbar_entity",
+                ),
+                # CNV PAGE
+                dbc.NavLink(
+                    [
+                        html.I(className="fa-solid fa-circle-nodes"),
+                        html.Span(
+                            "CNV Analysis",
+                            className="navbar_span",
+                        ),
+                    ],
+                    href="/cnv_page",
                     active="exact",
                     className="navbar_entity",
                 ),
@@ -384,6 +417,16 @@ PAGE_HOME = [
             ),
         ],
     ),
+    # CNV STATS
+    dbc.Row(
+    [
+        html.Span(
+            id="dd-study-info-cnv",
+            className="dd_study_infos",
+        ),
+    ],
+)
+
 ]
 
 
@@ -413,6 +456,8 @@ def redirect_pages(pathname):
         selected_page = PAGE_CLINICAL_DATA
     elif pathname == "/survival_analysis":
         selected_page = PAGE_SURVIVAL_ANALYSIS
+    elif pathname == "/cnv_page":
+        selected_page = PAGE_CNV_ANALYSIS
     return selected_page
 
 
@@ -439,12 +484,15 @@ def update_dropdown_liststudy(_):
     Output("dd-study-info-modularity", "children"),
     Output("dd-study-info-seed", "children"),
     Output("dd-study-info-resolution", "children"),
+    Output("dd-study-info-cnv", "children"),
     Input("dd-study", "value"),
 )
 def select_study(value) -> str:
     global CONTEXT_DATA
     global GRAPH
+    global GRAPH_CNV
     global CLUSTERS_INDEX
+    global CLUSTERS_CNV
     global DF_CLINICAL_DATA
     global NUMERIC_COLUMNS_CLINICAL
     global ALL_COLUMNS_CLINICAL
@@ -454,18 +502,19 @@ def select_study(value) -> str:
     global BOX_FIG_SELECTED_2
 
     if value is None:
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
     # prevent reload
     if value == CONTEXT_DATA["name_study"]:
         return (
             f"Study {value}",
-            f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
-            f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
-            f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
-            f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
-            f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
-            f"Seed: {CONTEXT_DATA['stats']['seed']}",
+            f"Number of patients: {CONTEXT_DATA['data']['stats_mut']['num_patient']}",
+            f"Number of genes: {CONTEXT_DATA['data']['stats_mut']['num_gene']}",
+            f"Number of variants: {CONTEXT_DATA['data']['stats_mut']['num_variant']}",
+            f"Number of clusters: {CONTEXT_DATA['data']['stats_mut']['num_cluster']}",
+            f"Cluster modularity: {CONTEXT_DATA['data']['stats_mut']['modularity']}",
+            f"Seed: {CONTEXT_DATA['data']['stats_mut']['seed']}",
             f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
+            build_cnv_block(),
         )
 
     # Load config
@@ -479,12 +528,48 @@ def select_study(value) -> str:
         CONTEXT_DATA["name_study"],
         "output",
     )
-    GRAPH = np.load(
-        CONTEXT_DATA["out_root_path"].joinpath("graph.npy"),
-        allow_pickle="TRUE",
-    ).item()
+    # --- Load mutation graph ---
+    mutation_path = CONTEXT_DATA["out_root_path"] / "graph_mutational.npy"
+    GRAPH = np.load(mutation_path, allow_pickle=True).item()
+    # --- Load CNV graph (optional) ---
+    cnv_path = CONTEXT_DATA["out_root_path"] / "graph_cnv.npy"
+    if cnv_path.exists():
+        GRAPH_CNV = np.load(cnv_path, allow_pickle=True).item()
+    else:
+        GRAPH_CNV = None
+    # --- CNV stats ---
+    if GRAPH_CNV is not None:
+        stats_cnv = pd.read_csv(
+            CONTEXT_DATA["out_root_path"] / "numerosity_cluster_cnv.csv",
+            sep="\t",
+            engine="python",
+        )
 
+        # Read modularity from modularity_cnv.info
+        modularity_cnv = None
+        modularity_cnv_path = CONTEXT_DATA["out_root_path"] / "modularity_cnv.info"
+        if modularity_cnv_path.exists():
+            with modularity_cnv_path.open("r") as f:
+                modularity_cnv = f.readline()
+
+        # Read seed from seed_cnv.info
+        seed_cnv = None
+        seed_cnv_path = CONTEXT_DATA["out_root_path"] / "seed_cnv.info"
+        if seed_cnv_path.exists():
+            with seed_cnv_path.open("r") as f:
+                seed_cnv = f.readline()
+
+        CONTEXT_DATA["data"]["stats_cnv"] = {
+            "num_patient": int(stats_cnv["Patient"].sum()),
+            "num_cnv": int(stats_cnv["CNV"].sum()),
+            "num_cluster": len(stats_cnv),
+            "modularity": modularity_cnv,
+            "seed": seed_cnv,
+        }
+    else:
+        CONTEXT_DATA["data"]["stats_cnv"] = None
     CLUSTERS_INDEX = [int(c) for c in set(GRAPH.vs["cluster"])]
+    CLUSTERS_CNV = [int(c) for c in set(GRAPH_CNV.vs["cluster"])] if GRAPH_CNV is not None else []
 
     DF_CLINICAL_DATA = pd.read_csv(
         CONTEXT_DATA["out_root_path"].joinpath("cluster_clinical_data.csv"),
@@ -515,32 +600,33 @@ def select_study(value) -> str:
         sep="\t",
         engine="python",
     )
-    CONTEXT_DATA["stats"]["num_patient"] = stats["Patient"].sum()
-    CONTEXT_DATA["stats"]["num_gene"] = stats["Gene"].sum()
-    CONTEXT_DATA["stats"]["num_variant"] = stats["Variant"].sum()
-    CONTEXT_DATA["stats"]["num_cluster"] = len(stats)
+    CONTEXT_DATA["data"]["stats_mut"]["num_patient"] = stats["Patient"].sum()
+    CONTEXT_DATA["data"]["stats_mut"]["num_gene"] = stats["Gene"].sum()
+    CONTEXT_DATA["data"]["stats_mut"]["num_variant"] = stats["Variant"].sum()
+    CONTEXT_DATA["data"]["stats_mut"]["num_cluster"] = len(stats)
     with (
         CONTEXT_DATA["out_root_path"]
         .joinpath("modularity.info")
         .open("r") as f
     ):
-        CONTEXT_DATA["stats"]["modularity"] = f.readline()
+        CONTEXT_DATA["data"]["stats_mut"]["modularity"] = f.readline()
     with (
         CONTEXT_DATA["out_root_path"]
         .joinpath("seed.info")
         .open("r") as f
     ):
-        CONTEXT_DATA["stats"]["seed"] = f.readline()
+        CONTEXT_DATA["data"]["stats_mut"]["seed"] = f.readline()
       
     return (
         f"Study {value}",
-        f"Number of patients: {CONTEXT_DATA['stats']['num_patient']}",
-        f"Number of genes: {CONTEXT_DATA['stats']['num_gene']}",
-        f"Number of variants: {CONTEXT_DATA['stats']['num_variant']}",
-        f"Number of clusters: {CONTEXT_DATA['stats']['num_cluster']}",
-        f"Cluster modularity: {CONTEXT_DATA['stats']['modularity']}",
-        f"Seed: {CONTEXT_DATA['stats']['seed']}",
+        f"Number of patients: {CONTEXT_DATA['data']['stats_mut']['num_patient']}",
+        f"Number of genes: {CONTEXT_DATA['data']['stats_mut']['num_gene']}",
+        f"Number of variants: {CONTEXT_DATA['data']['stats_mut']['num_variant']}",
+        f"Number of clusters: {CONTEXT_DATA['data']['stats_mut']['num_cluster']}",
+        f"Cluster modularity: {CONTEXT_DATA['data']['stats_mut']['modularity']}",
+        f"Seed: {CONTEXT_DATA['data']['stats_mut']['seed']}",
         f"Clustering resolution: {CONTEXT_DATA['config']['clustering_resolution']}",
+        build_cnv_block(),
     )
 
 
@@ -929,6 +1015,68 @@ PAGE_CREATE_STUDY = [
             ),
         ],
     ),
+    # COPY NUMBER VARIATION(CNV) FILE
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("File CNV:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    du.Upload(
+                        id="cnv-file",
+                        text="Upload CNV File",
+                        chunk_size=100,
+                    ),
+                ],
+                width=3,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        ["\\t", ",", ";"],
+                        placeholder="Select separator",
+                        id="cnv-separator",
+                    ),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Input(
+                        id="cnv-skiprow",
+                        type="number",
+                        placeholder="Skiprows",
+                        min=0,
+                    ),
+                ],
+                width=2,
+            ),
+        ],
+    ),
+    # COLUMN CNV IDENTIFIER
+    dbc.Row(
+        [
+            dbc.Col(
+                [
+                    html.H5("Column CNV Identifier:"),
+                ],
+                width=2,
+            ),
+            dbc.Col(
+                [
+                    dcc.Dropdown(
+                        options=[],
+                        id="column-cnv-identifier",
+                    ),
+                ],
+                width=3,
+            ),
+        ],
+    ),
     # CREATE STUDY BUTTON
     dbc.Row(
         [
@@ -1027,6 +1175,28 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     )
     return df_mut.columns, df_mut.columns, df_mut.columns, df_mut.columns
 
+# dropdown cnv identifier
+@callback(
+    Output("column-cnv-identifier", "options"),
+    [
+        Input("cnv-file", "isCompleted"),
+        State("cnv-file", "fileNames"),
+        Input("cnv-separator", "value"),
+        Input("cnv-skiprow", "value"),
+    ],
+    prevent_initial_call=True,
+)
+def update_list_columns_cnv_identifier(loaded, filename, sep, skip):
+    if not loaded or sep is None or skip is None:
+        return []
+    df_cnv = pd.read_csv(
+        Path("temp", filename[0]),
+        sep=sep,
+        skiprows=skip,
+        engine="python",
+        nrows=0,
+    )
+    return list(df_cnv.columns)
 
 @callback(
     Output("confirm-study", "displayed"),
@@ -1042,6 +1212,10 @@ def update_list_columns_mutation(loaded, filename, sep, skip):
     State("clinical-sample-file", "fileNames"),
     State("clinical-sample-separator", "value"),
     State("clinical-sample-skiprow", "value"),
+    State("cnv-file", "fileNames"),
+    State("cnv-separator", "value"),
+    State("cnv-skiprow", "value"),
+    State("column-cnv-identifier", "value"),
     State("dd-column-patient-name", "value"),
     State("dd-column-survival-event", "value"),
     State("dd-column-survival-time", "value"),
@@ -1067,6 +1241,10 @@ def create_study(
     clinical_sample_filename,
     clinical_sample_separator,
     clinical_sample_skiprow,
+    cnv_filename,
+    cnv_separator,
+    cnv_skiprow,
+    cnv_identifier,
     c_patient_name,
     c_surv_event,
     c_surv_time,
@@ -1129,6 +1307,16 @@ def create_study(
                 True,
                 "Please select column for sample name on clinical sample file",
             )
+    if cnv_filename is not None:
+        if cnv_separator is None:
+            return True, "Please select separator for CNV data"
+        if cnv_skiprow is None:
+            return True, "Please select skiprow for CNV data"
+        if cnv_identifier is None:
+            return (
+                True,
+                "Please select column for CNV identifier",
+            )
     if seed_trials is None:
         seed_trials = 10_000
     if clustering_resolution is None:
@@ -1150,11 +1338,17 @@ def create_study(
         Path("temp", clinical_sample_filename[0]).rename(
             Path("study", input_namestudy, "input", "clinical_sample.txt"),
         )
+    # CNV FILE
+    if cnv_filename is not None:
+        Path("temp", cnv_filename[0]).rename(
+            Path("study", input_namestudy, "input", "cnv_data.txt"),
+        )
     # GENERATE JSON CONFIG
     config_dict = {}
     config_dict["paths"] = {}
     config_dict["clinical_data"] = {}
     config_dict["mutation"] = {}
+    config_dict["cnv"] = {}
     config_dict["name"] = input_namestudy
     config_dict["paths"]["data_mutational"] = str(
         Path(
@@ -1216,6 +1410,18 @@ def create_study(
             clinical_sample_skiprow
         )
         config_dict["clinical_data"]["column_sample_name"] = c_sample_name
+    if cnv_filename is not None:
+        config_dict["paths"]["data_cnv"] = str(
+            Path(
+                "study",
+                input_namestudy,
+                "input",
+                "cnv_data.txt",
+            ),
+        )
+        config_dict["paths"]["data_cnv_sep"] = "\t"
+        config_dict["paths"]["data_cnv_skip"] = cnv_skiprow
+        config_dict["cnv"]["column_cnv_identifier"] = cnv_identifier
     PATH_CONFIG = Path("study", input_namestudy, "config.json")
     with PATH_CONFIG.open("w", encoding="utf-8") as f:
         json.dump(config_dict, f, indent=4)
@@ -1384,19 +1590,19 @@ PAGE_STUDY_DESCRIPTION = [
                     # LAYOUT SELECTOR
                     dcc.RadioItems(
                         options=[
-                            "cose",
-                            "concentric",
-                            "grid",
-                            "circle",
-                            "breadthfirst",
-                            "klay",
+                            {"label": "cose", "value": "cose"},
+                            {"label": "concentric", "value": "concentric"},
+                            {"label": "grid", "value": "grid"},
+                            {"label": "circle", "value": "circle"},
+                            {"label": "breadthfirst", "value": "breadthfirst"},
+                            {"label": "klay", "value": "klay"},
                         ],
                         value="cose",
                         inline=True,
                         id="radio-layouts",
                         persistence=True,
                         persistence_type="memory",
-                        style={"width": "100%", "height": "2vh"},
+                        labelStyle={"marginRight": "15px"},
                     ),
                 ],
                 lg=6,
@@ -1893,7 +2099,18 @@ PAGE_CLINICAL_DATA = [
             ),
         ],
     ),
-    dbc.Row([dash_table.DataTable(id="table_clinical_data")]),
+    dbc.Row([
+        dash_table.DataTable(
+            id="table_clinical_data",
+            columns=[], # to be set in the callback
+            data=[],    # to be set in the callback
+            filter_action="native",
+            filter_options={"case": "insensitive", "placeholder_text": "Filter..."},
+            sort_action="native",
+            page_size=10,
+            ),
+        html.Div(id="patient_summary"),
+        ]),
 ]
 
 
@@ -1962,15 +2179,50 @@ def update_box_2(cluster, col_name):
 
 
 # TABLE CLINICAL_DATA:
-@callback(Output("table_clinical_data", "data"), Input("dd-cluster", "value"))
+@callback(
+        Output("table_clinical_data", "data"),
+        Output("table_clinical_data", "columns"),
+        Input("dd-cluster", "value")
+    )
 def update_table_clinical_data(cluster):
     if cluster is None:
-        return no_update
+        return [], []
+
     global CLUSTER_SELECTED
     CLUSTER_SELECTED = cluster
-    cluster_values = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
-    return cluster_values.to_dict("records")
 
+    cluster_values = DF_CLINICAL_DATA[DF_CLINICAL_DATA["cluster"] == cluster]
+
+    data = cluster_values.to_dict("records")
+    columns = [{"name": c, "id": c} for c in cluster_values.columns]
+
+    return data, columns
+
+# INFO PATIENTS SUMMARY
+@callback(
+    Output("patient_summary", "children"),
+    Input("table_clinical_data", "derived_virtual_data")
+)
+def count_unique_patients(rows):
+    # Check data presence
+    if rows is None or len(rows) == 0:
+        return "No data present in the filtered table."
+
+    # Data arrives as a list of dicts from the front-end
+    df = pd.DataFrame(rows)
+
+    # Check if PATIENT_ID exists
+    if "PATIENT_ID" not in df.columns:
+        return "Column 'PATIENT_ID' not found in the table."
+
+    # Calculate unique values
+    unique_ids = df["PATIENT_ID"].unique()
+    count_unique = len(unique_ids)
+
+    return [
+        html.Div(f"Unique patients for cluster {CLUSTER_SELECTED}: {count_unique}"),
+        html.Div("Patients list: " + ", ".join(map(str, unique_ids)))
+    ]
 
 # SURVIVAL ANALYSIS
 PAGE_SURVIVAL_ANALYSIS = [
@@ -2477,7 +2729,275 @@ def update_multi_fig(list_clusters: list, col_name: str):
     BOX_FIG_SELECTED_1 = col_name
     return func_multi_plot(list_clusters, col_name)
 
+# PAGE CNV ANALYSIS
+PAGE_CNV_ANALYSIS = [
+    dbc.Modal(
+        id="modal-cnv",
+        size="lg",
+        is_open=False,
+        children=[]
+    ),
 
-# START
+    dbc.Row([
+        dbc.Col([
+            html.H3("CNV Analysis"),
+            html.Span("Cluster selected", className="span_selector"),
+            dcc.Dropdown(id="dd-cnv-cluster"),
+        ], lg=6)
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            html.Span("Number of patients"),
+            html.Hr(),
+            html.Span(0, id="cnv-n-patient"),
+        ], width=2, className="info_block add-border"),
+
+        dbc.Col([
+            html.Span("Number of CNV events"),
+            html.Hr(),
+            html.Span(0, id="cnv-n-events"),
+        ], width=2, className="info_block add-border"),
+
+        dbc.Col([
+            html.Span("Number of genes"),
+            html.Hr(),
+            html.Span(0, id="cnv-n-genes"),
+        ], width=2, className="info_block add-border"),
+
+        dbc.Col([
+            html.Span("CNV centroid"),
+            html.Hr(),
+            html.Span("None", id="cnv-centroid"),
+        ], width=2, className="info_block add-border"),
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            cyto.Cytoscape(
+                id="cytoscape-cnv",
+                className="add-border",
+                style={"width": "100%", "height": "35vh"},
+                stylesheet=[
+                    {"selector": "node", "style": {"content": "data(name)", "font-size": "5px"}},
+                    {"selector": ".PATIENT", "style": {"background-color": "coral", "shape": "triangle"}},
+                    {"selector": ".CNV", "style": {"background-color": "royalblue", "shape": "circle"}},
+                    {"selector": ":selected", "style": {"background-color": "#02cd79"}},
+                ],
+                minZoom=0.1,
+                maxZoom=2,
+            ),
+            dcc.RadioItems(
+                id="radio-cnv-layouts",
+                options=[
+                    {"label": "cose", "value": "cose"},
+                    {"label": "concentric", "value": "concentric"},
+                    {"label": "grid", "value": "grid"},
+                ],
+                value="cose",
+                inline=True
+            ),
+        ], lg=6),
+
+        dbc.Col([
+            dcc.Graph(id="cnv-pie", className="add-border", style={"width": "100%", "height": "35vh"}),
+        ], lg=6),
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id="cnv-degree", className="add-border",
+                      style={"width": "100%", "height": "35vh"}),
+        ], lg=8)
+    ]),
+
+    dbc.Row([
+        dbc.Col([
+            dcc.Graph(id="cnv-patient", className="add-border",
+                      style={"width": "100%", "height": "35vh"}),
+        ], lg=12)
+    ])
+]
+
+
+
+@callback(
+    Output("dd-cnv-cluster", "options"),
+    Output("dd-cnv-cluster", "value"),
+    Input("dd-cnv-cluster", "n_clicks")
+)
+def dropdown__cnv_cluster(_):
+    """Dropdown options for CNV cluster selection."""
+    if not CLUSTERS_CNV:
+        return [], None
+    return CLUSTERS_CNV, CLUSTER_SEL_CNV or CLUSTERS_CNV[0]
+
+@callback(
+    Output("modal-cnv", "children"),
+    Output("modal-cnv", "is_open"),
+    Input("cytoscape-cnv", "tapNodeData"),
+    prevent_initial_call=True,
+)
+def display_node_data_cnv(data_dict):
+    temp = ""
+    if data_dict["vertex_type"] == "CNV":
+        term_included = ["name", "gene", "cnv_type"]
+        for k, v in data_dict.items():
+            if k in term_included:
+                temp += f"**{k}**:{v}\n"
+    else:
+        term_excluded = [
+            "vertex_type",
+            "variants",
+            "color_vertex",
+            "shape_vertex",
+            "gene",
+            "sost_amm",
+            "consequence",
+            "color",
+            "cluster",
+            "id",
+            "timeStamp",
+        ]
+        for k, v in data_dict.items():
+            if k not in term_excluded:
+                temp += f"**{k}**:{v}\n"
+
+    return [
+        dbc.ModalHeader(dbc.ModalTitle(data_dict["name"])),
+        dcc.Markdown(temp, className="markdown"),
+    ], True
+
+
+# UPDATE CNV CLUSTER LAYOUT
+@callback(
+    Output("cytoscape-cnv", "layout"),
+    Input("radio-cnv-layouts", "value")
+)
+def update_graph_cnv(layout):
+    return {"name": layout}
+
+
+
+# SELECT CNV CLUSTER INDEX
+@callback(
+    Output("cytoscape-cnv", "elements"),
+    Output("cnv-pie", "figure"),
+    Output("cnv-degree", "figure"),
+    Output("cnv-patient", "figure"),
+    Output("cnv-n-patient", "children"),
+    Output("cnv-n-events", "children"),
+    Output("cnv-n-genes", "children"),
+    Output("cnv-centroid", "children"),
+    Input("dd-cnv-cluster", "value"),
+)
+def update_cluster_cnv(cluster):
+    if cluster is None or GRAPH_CNV is None:
+        return (
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+        )
+
+    global CLUSTER_SEL_CNV
+    CLUSTER_SEL_CNV = cluster
+
+    cluster_elements = filter_graph(cluster, graph_type="cnv")
+
+    df_gene = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "count_cluster_list_cnv",
+            f"count_cluster_{cluster}.csv",
+        ),
+        sep="\t",
+        engine="python",
+    )
+    fig_pie = px.pie(
+        df_gene,
+        values="COUNT",
+        names="CNV GENE",
+        title="CNV events per gene",
+    )
+    fig_pie.update_traces(textposition="inside", textinfo="label")
+
+    df_events = pd.read_csv(
+        Path(
+            CONTEXT_DATA["out_root_path"],
+            "variants_degree_cnv",
+            f"variants_degree_cnv_cluster_{cluster}.csv",
+        ),
+        sep="\t",
+    )
+
+    n_events = len(df_events)
+
+    df_plot = df_events.sort_values("Degree", ascending=False).head(15)
+
+    fig_degree = px.bar(
+        df_plot,
+        x="CNV",
+        y="Degree",
+        title="CNV degree",
+    )
+
+
+    n_patients = sum(
+        1 for e in cluster_elements
+        if e["data"].get("vertex_type") == "PATIENT"
+    )
+    n_genes = len(df_gene)
+
+    # Calculate CNV events per patient
+    cnv_per_patient = {}
+    for e in cluster_elements:
+        if e["data"].get("vertex_type") == "PATIENT":
+            patient = e["data"].get("name")
+            # Count edges connected to this patient
+            patient_degree = 0
+            for edge_elem in cluster_elements:
+                if "source" in edge_elem["data"] and "target" in edge_elem["data"]:
+                    if edge_elem["data"]["target"] == e["id"] or edge_elem["data"]["source"] == e["id"]:
+                        # Check if connected to a CNV node
+                        other_id = edge_elem["data"]["source"] if edge_elem["data"]["target"] == e["id"] else edge_elem["data"]["target"]
+                        for other_e in cluster_elements:
+                            if "id" in other_e and other_e["id"] == other_id and other_e["data"].get("vertex_type") == "CNV":
+                                patient_degree += 1
+            if patient_degree > 0:
+                cnv_per_patient[patient] = patient_degree
+
+    if cnv_per_patient:
+        df_patient_cnv = pd.DataFrame(list(cnv_per_patient.items()), columns=["Patient", "CNV Events"])
+        df_patient_cnv = df_patient_cnv.sort_values("CNV Events", ascending=False)
+        fig_patient_cnv = px.bar(
+            df_patient_cnv,
+            x="Patient",
+            y="CNV Events",
+            title="CNV events per patient",
+        )
+    else:
+        fig_patient_cnv = px.bar(title="CNV events per patient")
+
+    if len(df_plot) >= 2 and df_plot.iloc[0]["Degree"] == df_plot.iloc[1]["Degree"]:
+        centroid = "More than one"
+    elif len(df_plot) >= 1:
+        centroid = df_plot.iloc[0]["CNV"]
+    else:
+        centroid = "None"
+    return (
+        cluster_elements,
+        fig_pie,
+        fig_degree,
+        fig_patient_cnv,
+        n_patients,
+        n_events,
+        n_genes,
+        centroid,
+    )# START
 if __name__ == "__main__":
     APP.run(debug=False, host="0.0.0.0", port=8593)

@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
-"""Module taht creates graphs and performs clustering and enrichment analysis.
+"""Module that creates graphs and performs clustering and enrichment analysis.
+
+This module processes mutational and clinical data, creates bipartite graphs
+(patients-variants for mutations and patients-genes for CNV), performs Leiden
+clustering, and analyzes gene/CNV enrichment by cluster.
 
 Functions:
+    main(path_config): Main function to process data and perform analysis.
+        Handles both mutation and optional CNV data to create and analyze graphs.
     load_df(config): Loads mutational and clinical data from CSV files.
     filter_vaf(config, df_mut): Filters mutations based on VAF score.
     enrichment_with_r(path_save, map_c): Performs enrichment analysis.
-    main(path_config): Main function to process data and perform analysis.
+
+Features:
+    - Mutation graph analysis: Creates bipartite graphs of patients and variants
+    - CNV analysis: Optional Copy Number Variation analysis with separate graph
+    - Leiden clustering: Community detection with seed optimization
+    - Enrichment analysis: Gene set enrichment using R scripts
+    - Output generation: CSV files with cluster statistics and centroids
 
 Usage:
     Run this module as a script with the required configuration file path:
@@ -55,7 +67,7 @@ def main(path_config: Path) -> None:
     Path(path_save).mkdir(parents=True, exist_ok=True)
     # load df
     logger.info(" 10% -- Load files")
-    df_mut, data_clinical_sample, data_clinical_patient = libu.load_df(config)
+    df_mut, data_clinical_sample, data_clinical_patient, data_cnv = libu.load_df(config)
     # create maps and graph
     logger.info(" 20% -- Add category mutations")
     if len(identifier_columns) > 1:
@@ -66,7 +78,7 @@ def main(path_config: Path) -> None:
     # VAF filter
     if config["mutation"]["vaf_score"]:
         config, df_mut = libu.filter_vaf(config, df_mut)
-    logger.info(" 30% -- Create maps")
+    logger.info(" 25% -- Create maps")
     map_patients, map_variants = libu.create_maps(
         df_mut,
         column_mutation_name,
@@ -75,6 +87,28 @@ def main(path_config: Path) -> None:
         config["mutation"]["vaf_score"],
         config["mutation"]["vaf_column"],
     )
+    # Add CNV
+    logger.info(" 30% -- Add CNV analysis if data is available")
+    cnv_available = not (data_cnv is None or data_cnv.empty)
+    if cnv_available:
+        logger.info(" CNV detected: processing...")
+
+        data_cnv = libu.preprocess_cnv(data_cnv)
+
+        cnv_identifier_columns = config["cnv"]["column_cnv_identifier"].split(";")
+
+        if len(cnv_identifier_columns) > 1:
+            data_cnv = libu.adding_category_mutation(data_cnv, cnv_identifier_columns)
+            column_cnv_name = "TN_cnv_label"
+        else:
+            column_cnv_name = cnv_identifier_columns[0]
+
+        map_pat, map_cnv = libu.create_cnv_map(data_cnv)
+    else:
+        logger.info(" No CNV file provided: skipping CNV analysis.")
+        data_cnv = None
+        map_pat, map_cnv = None, None
+
     # cluster
     logger.info(" 40% -- Create graph")
     g = libu.graph_creation(map_patients, map_variants)
@@ -96,6 +130,32 @@ def main(path_config: Path) -> None:
         map_patients,
         map_variants,
     )
+    # cluster CNV ############################### IF CNV AVAILABLE
+    if cnv_available:
+        logger.info(" 63% -- Create CNV graph")
+        g2 = libu.graph_cnv(map_pat, map_cnv)
+
+        logger.info(" 66% -- CNV Clustering")
+        bs2 = libu.selected_seed(g2, config["seed_trials"], config["clustering_resolution"])
+        dendro_cnv = libu.leiden_clustering(g2, bs2, config["clustering_resolution"])
+
+        with Path(path_save, "modularity_cnv.info").open("w") as f:
+            f.write(str(round(dendro_cnv.modularity, 4)))
+
+        with Path(path_save, "seed_cnv.info").open("w") as f:
+            f.write(str(bs2))
+
+        # colors, mapping, attributes
+        g2 = libu.adding_graph_color(g2, dendro_cnv)
+        map_c2 = libu.map_cluster_creation(g2, dendro_cnv)
+        map_pat, map_cnv = libu.adding_cluster_to_map_cnv(map_c2, map_pat, map_cnv)
+
+        g2 = libu.cluster_cnv_noded_attributes(g2, map_pat, map_cnv)
+        libu.save_graph_to_file(g2, path_save, name="graph_cnv")
+    else:
+        g2 = None
+        dendro_cnv = None
+        map_c2 = None
     logger.info(" 70% -- Add metadata")
     g = libu.cluster_noded_attributes(g, map_patients, map_variants)
     # add info
@@ -113,8 +173,8 @@ def main(path_config: Path) -> None:
         )
     g = libu.adding_clinical_info_graph(g, map_patients)
     logger.info(" 80% -- Export infos")
-    libu.save_graph_to_file(g, path_save)
-    # create inofo files
+    libu.save_graph_to_file(g, path_save, name="graph_mutational")
+    # create info files
     libu.summary_info(
         g,
         map_c,
@@ -134,6 +194,20 @@ def main(path_config: Path) -> None:
     libu.creation_cluster_clinical_data(map_patients, path_save)
     libu.centroids_cluster(dendro, path_save)
     libu.degree_variant_cluster(map_c, g, path_save)
+
+    if cnv_available:
+        libu.numerosity_info_cnv(g2, map_c2, path_save)
+        map_cluster_cnv_abs, _ = libu.count_gene_abs_percent_cnv(
+            g2,
+            map_c2,
+            libu.count_gene_cnv(g2),
+            path_save,
+        )
+        libu.genes_single_cluster_cnv(g2, map_c2, path_save)
+        libu.genes_count_cnv_single_cluster(map_cluster_cnv_abs, path_save)
+        libu.degree_variant_cluster_cnv(map_c2, g2, path_save)
+        libu.centroids_cluster_cnv(dendro_cnv, path_save)
+
     # enrichment
     logger.info(" 90% -- Enrichment")
     libu.enrichment_with_r(path_save, map_c)
